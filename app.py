@@ -155,7 +155,7 @@ with st.sidebar:
         st.success("✅ Ficheiro carregado")
     else:
         # Default: load from repo / local sample
-        data_source = "/mnt/user-data/uploads/precos_CAPD.xlsx"
+        data_source = "precos_CAPD.xlsx"
         st.info("Usando ficheiro de demonstração")
 
     st.markdown("---")
