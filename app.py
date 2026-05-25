@@ -203,33 +203,39 @@ def classify_sku(price_series, outlier_min_count=3, outlier_min_pct=5.0):
     most_common_count = cnt.most_common(1)[0][1]
     if most_common_count/n >= 0.90 or len(unique_prices) == 1:
         return {"tipo":"Preço Único","preco_high":max(prices),"preco_low":None,"prof_promo":0.0,"alerta":None}
-    median_p = float(np.median(prices))
-    highs = [p for p in unique_prices if p >= median_p]
-    lows  = [p for p in unique_prices if p <  median_p]
-    if not lows:
-        lows  = [min(unique_prices)]
-        highs = [p for p in unique_prices if p > min(unique_prices)]
-    est_high = max(highs, key=lambda p: cnt[p])
-    est_low  = max(lows,  key=lambda p: cnt[p])
+
+    # ── H-L core: the TWO most frequent prices define the established High and Low.
+    # This is more robust than median-split because it correctly identifies the
+    # dominant price pair regardless of how many "new" prices exist.
+    top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
+    est_high = max(top2)   # higher of the two dominant prices = regular/full price
+    est_low  = min(top2)   # lower  of the two dominant prices = promo price
+
     known = {est_high, est_low}
     prof = (1 - est_low/est_high)*100 if est_high > 0 else 0.0
+
     alerts = []
     for np_ in unique_prices:
         if np_ in known: continue
         cnt_p = cnt[np_]
         pct_p = cnt_p/n*100
-        # Outlier filter: must appear ≥ outlier_min_count times AND ≥ outlier_min_pct of readings
+        # Outlier filter
         if cnt_p < outlier_min_count or pct_p < outlier_min_pct: continue
-        dist_high = abs(np_ - est_high)
-        dist_low  = abs(np_ - est_low)
+        # Classification by absolute position relative to established H-L:
+        # - above est_high → brand raised the regular price (Novo High)
+        # - below est_low  → brand ran a deeper-than-usual promo (Novo Low)
+        # - between:       → proximity determines which cluster it replaces
         if np_ > est_high:
             kind = "Novo High ↑"; old_val = est_high; new_prof = (1-est_low/np_)*100
         elif np_ < est_low:
             kind = "Novo Low ↓";  old_val = est_low;  new_prof = (1-np_/est_high)*100
-        elif dist_low <= dist_high:
-            kind = "Novo Low ↓";  old_val = est_low;  new_prof = (1-np_/est_high)*100
         else:
-            kind = "Novo High ↑"; old_val = est_high; new_prof = (1-est_low/np_)*100
+            dist_high = abs(np_ - est_high)
+            dist_low  = abs(np_ - est_low)
+            if dist_low <= dist_high:
+                kind = "Novo Low ↓";  old_val = est_low;  new_prof = (1-np_/est_high)*100
+            else:
+                kind = "Novo High ↑"; old_val = est_high; new_prof = (1-est_low/np_)*100
         alerts.append({"tipo":kind,"preco_anterior":old_val,"preco_novo":np_,
                         "prof_anterior":round(prof,1),"prof_nova":round(new_prof,1),
                         "n_leituras":cnt_p,"pct_leituras":round(pct_p,1)})
@@ -394,6 +400,15 @@ with tab2:
     st.markdown('<div class="section-header">📈 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
 
     # ── Filters ──
+    # ── Period filter (affects price history chart; classifications use full history) ──
+    p2a, p2b = st.columns([1, 3])
+    with p2a:
+        period2 = st.date_input("Período de análise", value=(min_date, max_date),
+                                 min_value=min_date, max_value=max_date, key="period2")
+        p2_start, p2_end = (period2[0], period2[1]) if len(period2)==2 else (min_date, max_date)
+    with p2b:
+        st.caption("O período afecta o gráfico de evolução de preços. As classificações High/Low e alertas usam sempre o histórico completo.")
+
     f2a, f2b, f2c, f2e, f2d = st.columns([1,1,1,1,2])
     with f2a:
         ret2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
@@ -524,7 +539,7 @@ with tab2:
             if selected_rows:
                 idx = selected_rows[0]
                 row = sub_sorted.iloc[idx]
-                sub_hist = df[(df["PID"]==row["PID"]) & (df["Retalhista"]==row["Retalhista"])].sort_values("Data")
+                sub_hist = df[(df["PID"]==row["PID"]) & (df["Retalhista"]==row["Retalhista"]) & (df["Data"].dt.date >= p2_start) & (df["Data"].dt.date <= p2_end)].sort_values("Data")
                 st.markdown(f"**{row['Nome']}**  \n_{row['Marca']} · {row['Quantidade']}_")
                 fig2 = go.Figure()
                 if row["Tipo_Preco"]=="High-Low" and row["Preco_High"] and row["Preco_Low"]:
@@ -706,21 +721,20 @@ with tab5:
     glossario = load_glossario()
 
     # ── Build export CSV (always, even if empty) ─────────────────────────────
+    # Export = ALL SKUs from df_sku_list, with Formato from glossario (or blank if unclassified)
     gl_rows = []
-    for key_id, fmt in glossario.items():
-        pid, ret = key_id.rsplit("_", 1)
-        row_m = df_sku_list[(df_sku_list["PID"]==pid) & (df_sku_list["Retalhista"]==ret)]
-        r = row_m.iloc[0] if not row_m.empty else None
+    for _, sku_row in df_sku_list.iterrows():
+        key_id = f"{sku_row['PID']}_{sku_row['Retalhista']}"
+        fmt = glossario.get(key_id, None)
         gl_rows.append({
-            "PID":        pid,
-            "Retalhista": ret,
-            "Nome":       r["Nome"]       if r is not None and pd.notna(r.get("Nome"))       else "",
-            "Marca":      r["Marca"]      if r is not None and pd.notna(r.get("Marca"))      else "",
-            "Quantidade": r["Quantidade"] if r is not None and pd.notna(r.get("Quantidade")) else "",
-            "Formato":    fmt,
+            "PID":        sku_row["PID"],
+            "Retalhista": sku_row["Retalhista"],
+            "Nome":       str(sku_row["Nome"])       if pd.notna(sku_row.get("Nome"))       else "",
+            "Marca":      str(sku_row["Marca"])      if pd.notna(sku_row.get("Marca"))      else "",
+            "Quantidade": str(sku_row["Quantidade"]) if pd.notna(sku_row.get("Quantidade")) else "",
+            "Formato":    fmt if fmt else "",
         })
-    df_gl_export = pd.DataFrame(gl_rows) if gl_rows else pd.DataFrame(
-        columns=["PID","Retalhista","Nome","Marca","Quantidade","Formato"])
+    df_gl_export = pd.DataFrame(gl_rows)
     csv_gl = df_gl_export.to_csv(index=False).encode("utf-8")
 
     # ── Top bar ───────────────────────────────────────────────────────────────
