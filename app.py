@@ -8,7 +8,7 @@ from io import BytesIO
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="CAPD · Price Intelligence",
+    page_title="Monitoramento de Preços | IceCream Portugal",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -209,7 +209,7 @@ df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <h1 style='font-family:"DM Serif Display",serif; font-size:2.4rem; margin-bottom:.2rem;'>
-    CAPD · Price Intelligence
+    Monitoramento de Preços | IceCream Portugal
 </h1>
 <p style='color:#888; font-size:.95rem; margin-bottom:1.5rem;'>
     Monitorização de preços · Continente · Auchan · Pingo Doce
@@ -243,7 +243,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ════════════════════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs([
     "🆕 Produtos Novos",
-    "📈 Análise de Preços",
+    "📈 Alerta de Mudança de Preço",
     "🏷️ Descontos Promocionais",
     "🔍 Produto Individual",
 ])
@@ -292,8 +292,8 @@ with tab1:
             color = RETAILER_COLORS.get(ret, "#333")
             st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} novos</span>", unsafe_allow_html=True)
 
-            display = sub[["Nome","Marca","Quantidade","Preco","Primeira_Leitura"]].copy()
-            display.columns = ["Nome","Marca","Quantidade","Preço atual (€)","1ª Leitura"]
+            display = sub[["PID","Nome","Marca","Quantidade","Preco","Primeira_Leitura"]].copy()
+            display.columns = ["ID","Nome","Marca","Quantidade","Preço atual (€)","1ª Leitura"]
             display["1ª Leitura"] = display["1ª Leitura"].dt.strftime("%d/%m/%Y")
             display["Preço atual (€)"] = display["Preço atual (€)"].map("{:.2f} €".format)
             st.dataframe(display, use_container_width=True, hide_index=True)
@@ -322,7 +322,7 @@ with tab1:
 # TAB 2 — ANÁLISE DE PREÇOS
 # ─────────────────────────────────────────────────────────────────
 with tab2:
-    st.markdown('<div class="section-header">📈 Análise de Preços por Produto</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📈 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
 
     # Per (PID, Retalhista) compute min / max / unique prices
     summary = (
@@ -336,20 +336,25 @@ with tab2:
         .reset_index()
     )
     summary["Variacao_Pct"] = ((summary["Maximo"] - summary["Minimo"]) / summary["Maximo"] * 100).round(1)
-    summary["Houve_Alteracao"] = summary["Precos_Distintos"] > 1
+    summary["Houve_Alteracao"] = summary["Precos_Distintos"] >= 3
 
-    st.markdown(f"**{len(summary)} SKU × retalhista** no período seleccionado.")
+    st.markdown("SKUs que apresentaram **mais do que 2 preços históricos** no período seleccionado.")
 
-    c1, c2 = st.columns([1, 2])
+    c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
     with c1:
-        show_changed = st.checkbox("🔴 Apenas com alteração de preço", value=False)
-        brand_filter = st.multiselect("Filtrar por marca", sorted(summary["Marca"].unique()))
+        show_changed = st.checkbox("🔴 Produtos com 3+ preços registrados", value=False)
     with c2:
-        search = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's")
+        ret_filter_tab2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret_tab2")
+    with c3:
+        brand_filter = st.multiselect("Marca", sorted(summary["Marca"].unique()), key="brand_tab2")
+
+    search = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's")
 
     filtered = summary.copy()
     if show_changed:
-        filtered = filtered[filtered["Houve_Alteracao"]]
+        filtered = filtered[filtered["Precos_Distintos"] >= 3]
+    if ret_filter_tab2:
+        filtered = filtered[filtered["Retalhista"].isin(ret_filter_tab2)]
     if brand_filter:
         filtered = filtered[filtered["Marca"].isin(brand_filter)]
     if search:
@@ -506,7 +511,7 @@ with tab4:
 st.markdown("---")
 st.markdown(
     "<p style='text-align:center;color:#bbb;font-size:.8rem;'>"
-    "CAPD Price Intelligence · Actualizado automaticamente com o ficheiro Excel do scraper"
+    "Monitoramento de Preços IceCream Portugal · Actualizado automaticamente com o ficheiro Excel do scraper"
     "</p>",
     unsafe_allow_html=True,
 )
