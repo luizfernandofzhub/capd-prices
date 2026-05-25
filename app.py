@@ -87,11 +87,13 @@ def load_data(source):
                 except: pass
         rows = []
         for _, row in df.iterrows():
+            formato = row["Formato"] if "Formato" in df.columns and pd.notna(row.get("Formato")) else None
             for col, dt in date_map.items():
                 val = row[col]
                 if pd.notna(val):
                     rows.append({"PID":row["PID"],"Nome":row["Nome"],"Marca":row["Marca"],
-                                 "Quantidade":row["Quantidade"],"Retalhista":name,"Data":dt,"Preco":float(val)})
+                                 "Quantidade":row["Quantidade"],"Formato":formato,
+                                 "Retalhista":name,"Data":dt,"Preco":float(val)})
         sheets[name] = pd.DataFrame(rows)
     if not sheets: return pd.DataFrame()
     df_all = pd.concat(sheets.values(), ignore_index=True)
@@ -156,9 +158,10 @@ def build_classifications(df_input):
         if has_high and has_low: alert_label = "Novo High+Low"
         elif has_high:           alert_label = "Novo High"
         elif has_low:            alert_label = "Novo Low"
+        fmt = m.get("Formato") if hasattr(m, "get") else (m["Formato"] if "Formato" in m.index else None)
         records.append({
             "PID":m["PID"],"Retalhista":ret,"Nome":m["Nome"],"Marca":m["Marca"],
-            "Quantidade":m["Quantidade"],"Tipo_Preco":cls["tipo"],
+            "Quantidade":m["Quantidade"],"Formato":fmt,"Tipo_Preco":cls["tipo"],
             "Preco_High":cls["preco_high"],"Preco_Low":cls["preco_low"],
             "Prof_Promo":cls["prof_promo"],"Alertas":cls["alerta"],
             "Alert_Label":alert_label,
@@ -204,6 +207,11 @@ with st.sidebar:
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 sku_cls   = build_classifications(df)
 
+# ── SKU static metadata (one row per PID×Retalhista, with Formato) ──────
+df_sku_meta = (df.sort_values("Data")
+               .drop_duplicates(subset=["PID","Retalhista"], keep="last")
+               [["PID","Retalhista","Nome","Marca","Quantidade","Formato"]])
+
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <h1 style='font-family:"DM Serif Display",serif;font-size:2.2rem;margin-bottom:.1rem;'>
@@ -231,11 +239,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🆕 Produtos Novos",
     "📈 Alerta de Mudança de Preço",
     "📋 Todos os Produtos",
     "📊 Evolução de Preços",
+    "🏷️ SKUs não classificados",
 ])
 
 # ═══════════════════════════════════════════════════════════════════
@@ -440,13 +449,16 @@ with tab2:
 # ═══════════════════════════════════════════════════════════════════
 with tab3:
     st.markdown('<div class="section-header">📋 Todos os Produtos</div>', unsafe_allow_html=True)
-    fa, fb, fc, fd = st.columns(4)
+    fa, fb, fc, fd, fe = st.columns(5)
     with fa:
         f_ret  = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="f_ret_all")
     with fb:
         f_brand = st.multiselect("Marca", sorted(df["Marca"].dropna().unique()), key="f_brand_all")
     with fc:
         f_size  = st.multiselect("Tamanho", sorted(df["Quantidade"].dropna().astype(str).unique()), key="f_size_all")
+    with fe:
+        all_fmts = sorted(df["Formato"].dropna().unique()) if "Formato" in df.columns else []
+        f_fmt = st.multiselect("Formato", all_fmts, key="f_fmt_all")
     with fd:
         f_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="f_period_all")
         fp_s, fp_e = (f_period[0],f_period[1]) if len(f_period)==2 else (min_date,max_date)
@@ -457,6 +469,7 @@ with tab3:
     if f_brand:  df3 = df3[df3["Marca"].isin(f_brand)]
     if f_size:   df3 = df3[df3["Quantidade"].astype(str).isin(f_size)]
     if f_search3:df3 = df3[df3["Nome"].str.contains(f_search3, case=False, na=False)]
+    if f_fmt and "Formato" in df3.columns: df3 = df3[df3["Formato"].isin(f_fmt)]
 
     all_sum = (df3.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
                .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
@@ -474,7 +487,11 @@ with tab3:
         color = RETAILER_COLORS.get(ret,"#333")
         st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} SKUs</span>", unsafe_allow_html=True)
         d = sub[["PID","Nome","Marca","Quantidade","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]].copy()
-        d.columns = ["ID","Nome","Marca","Tamanho","Estratégia","Preço Atual €","Mín €","Máx €","Prof. Promo %","Alerta","Leituras"]
+        # Add Formato from meta
+        meta_fmt = df_sku_meta[df_sku_meta["Retalhista"]==ret][["PID","Formato"]]
+        d = d.merge(meta_fmt, on="PID", how="left")
+        d = d[["PID","Nome","Marca","Quantidade","Formato","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]]
+        d.columns = ["ID","Nome","Marca","Tamanho","Formato","Estratégia","Preço Atual €","Mín €","Máx €","Prof. Promo %","Alerta","Leituras"]
         d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
         d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
         d["Máx €"]         = d["Máx €"].map("{:.2f}".format)
@@ -489,7 +506,7 @@ with tab4:
     st.markdown('<div class="section-header">📊 Evolução de Preços</div>', unsafe_allow_html=True)
     st.markdown("Seleciona os filtros para visualizar a evolução histórica de múltiplos SKUs num único gráfico.")
 
-    g1, g2, g3, g4, g5 = st.columns(5)
+    g1, g2, g3, g4, g5, g6 = st.columns(6)
     with g1:
         g_ret   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="g_ret")
     with g2:
@@ -498,6 +515,9 @@ with tab4:
         g_size  = st.multiselect("Tamanho", sorted(df["Quantidade"].dropna().astype(str).unique()), key="g_size")
     with g4:
         g_tipo  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="g_tipo")
+    with g6:
+        g_fmts_avail = sorted(df["Formato"].dropna().unique()) if "Formato" in df.columns else []
+        g_fmt = st.multiselect("Formato", g_fmts_avail, key="g_fmt")
     with g5:
         g_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="g_period")
         gp_s, gp_e = (g_period[0],g_period[1]) if len(g_period)==2 else (min_date,max_date)
@@ -510,6 +530,7 @@ with tab4:
     if g_brand:  dg = dg[dg["Marca"].isin(g_brand)]
     if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
     if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
+    if g_fmt and "Formato" in dg.columns: dg = dg[dg["Formato"].isin(g_fmt)]
 
     # Apply strategy filter via sku_cls
     if g_tipo:
@@ -553,6 +574,114 @@ with tab4:
             margin=dict(t=20, b=20, l=10, r=10),
         )
         st.plotly_chart(fig4, use_container_width=True, key="chart_tab4_multi")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# TAB 5 — SKUs NÃO CLASSIFICADOS
+# ═══════════════════════════════════════════════════════════════════
+with tab5:
+    st.markdown('<div class="section-header">🏷️ SKUs não classificados</div>', unsafe_allow_html=True)
+    st.markdown(
+        "Lista de SKUs sem **Formato** definido no ficheiro Excel. "
+        "Classifica cada um abaixo usando a lista suspensa. "
+        "**Atenção:** as classificações feitas aqui são temporárias (ficam na sessão). "
+        "Para torná-las permanentes, exporta a tabela e actualiza o teu ficheiro Excel."
+    )
+
+    FORMATO_OPTIONS = ["— seleccionar —", "Bars","Bites","Bites - PromoPack","Cakes",
+                       "Cones","Cups","Frozen Fruits","Other","Pints","Pints - PromoPack",
+                       "Pots","Sandwich","Sticks","Tubs"]
+
+    # Get unclassified SKUs from df_sku_meta
+    unclass = df_sku_meta[df_sku_meta["Formato"].isna()].copy().reset_index(drop=True)
+
+    if unclass.empty:
+        st.success("✅ Todos os SKUs têm Formato definido!")
+    else:
+        # Filter by retailer
+        uc_ret = st.multiselect("Filtrar por retalhista", retailers_sel,
+                                 default=retailers_sel, key="uc_ret")
+        unclass = unclass[unclass["Retalhista"].isin(uc_ret)]
+
+        st.markdown(f"**{len(unclass)} SKU(s) sem classificação** nos retalhistas seleccionados.")
+        st.markdown("---")
+
+        # Session state to store temporary classifications
+        if "formato_temp" not in st.session_state:
+            st.session_state["formato_temp"] = {}
+
+        # Group by retailer
+        for ret in RETAILER_ORDER:
+            sub_uc = unclass[unclass["Retalhista"]==ret].copy()
+            if sub_uc.empty: continue
+            color = RETAILER_COLORS.get(ret,"#333")
+            st.markdown(
+                f"#### {ret} &nbsp; "
+                f"<span style='font-size:.85rem;color:{color}'>{len(sub_uc)} SKUs</span>",
+                unsafe_allow_html=True
+            )
+            for _, row in sub_uc.iterrows():
+                key_id = f"{row['PID']}_{ret}"
+                current = st.session_state["formato_temp"].get(key_id, "— seleccionar —")
+                nome_str = str(row["Nome"]) if pd.notna(row["Nome"]) else f"(sem nome · PID {row['PID']})"
+                marca_str = str(row["Marca"]) if pd.notna(row["Marca"]) else "—"
+                qtd_str   = str(row["Quantidade"]) if pd.notna(row["Quantidade"]) else "—"
+
+                col_info, col_sel = st.columns([3, 1])
+                with col_info:
+                    info_line = f"**{nome_str}**  \n<span style='color:#888;font-size:.82rem'>Marca: {marca_str} · Qtd: {qtd_str} · PID: {row['PID']}</span>"
+                    st.markdown(info_line, unsafe_allow_html=True)
+                with col_sel:
+                    chosen = st.selectbox(
+                        "Formato",
+                        FORMATO_OPTIONS,
+                        index=FORMATO_OPTIONS.index(current) if current in FORMATO_OPTIONS else 0,
+                        key=f"fmt_sel_{key_id}",
+                        label_visibility="collapsed",
+                    )
+                    if chosen != "— seleccionar —":
+                        if st.session_state["formato_temp"].get(key_id) != chosen:
+                            st.session_state["formato_temp"][key_id] = chosen
+                            st.rerun()
+
+                # Show confirmation badge if classified
+                if current != "— seleccionar —":
+                    st.markdown(
+                        f'<span class="tag tag-new" style="background:#dcfce7;color:#166534">✔ {current}</span>',
+                        unsafe_allow_html=True
+                    )
+                st.markdown("<hr style='margin:.4rem 0;border-color:#f1f5f9;'>", unsafe_allow_html=True)
+
+        # ── Export table of pending classifications ──────────────────
+        classified_in_session = {k: v for k, v in st.session_state["formato_temp"].items()
+                                  if v != "— seleccionar —"}
+        if classified_in_session:
+            st.markdown("---")
+            st.markdown(f"#### ✅ {len(classified_in_session)} SKU(s) classificado(s) nesta sessão")
+            export_rows = []
+            for key_id, fmt in classified_in_session.items():
+                pid, ret = key_id.rsplit("_", 1)
+                row_m = df_sku_meta[(df_sku_meta["PID"].astype(str)==pid) &
+                                    (df_sku_meta["Retalhista"]==ret)]
+                if not row_m.empty:
+                    r = row_m.iloc[0]
+                    export_rows.append({
+                        "PID": r["PID"], "Retalhista": ret,
+                        "Nome": r["Nome"], "Marca": r["Marca"],
+                        "Quantidade": r["Quantidade"], "Formato Sugerido": fmt,
+                    })
+            if export_rows:
+                df_export = pd.DataFrame(export_rows)
+                st.dataframe(df_export, use_container_width=True, hide_index=True)
+                csv = df_export.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "⬇️ Exportar classificações para CSV",
+                    csv,
+                    file_name="skus_classificados.csv",
+                    mime="text/csv",
+                    key="download_cls",
+                )
+                st.info("💡 Copia os valores da coluna 'Formato Sugerido' para o teu ficheiro Excel e volta a fazer upload.")
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
