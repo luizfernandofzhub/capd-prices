@@ -444,7 +444,7 @@ with tab2:
     with fa2:
         ret_filter_tab2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret_tab2")
     with fb2:
-        brand_filter_tab2 = st.multiselect("Marca", sorted(sku_cls["Marca"].unique()), key="brand_tab2")
+        brand_filter_tab2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand_tab2")
     with fc2:
         search_tab2 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's", key="search_tab2")
 
