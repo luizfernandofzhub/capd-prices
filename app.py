@@ -107,11 +107,28 @@ FORMATO_OPTIONS = ["Bars","Bites","Bites - PromoPack","Cakes","Cones","Cups",
                    "Frozen Fruits","Other","Pints","Pints - PromoPack",
                    "Pots","Sandwich","Sticks","Tubs"]
 
+@st.cache_data(ttl=3600)
+def load_glossario_csv_from_github():
+    """Try to load glossario_formato.csv from the same repo as the app.
+    Returns a dict or empty dict if file not found."""
+    try:
+        df_csv = pd.read_csv("glossario_formato.csv")
+        df_csv["PID"] = df_csv["PID"].astype(str)
+        result = {}
+        for _, row in df_csv.iterrows():
+            if pd.notna(row.get("Formato")) and str(row.get("Formato","")) not in ("","nan"):
+                key = f"{row['PID']}_{row['Retalhista']}"
+                result[key] = str(row["Formato"])
+        return result
+    except Exception:
+        return {}
+
 def load_glossario():
-    """Load the persisted glossário from session_state (backed by st.cache_resource trick).
-    Returns a dict {'PID_Retalhista': 'Formato'}."""
+    """Load glossário from session_state. On first load, seeds from GitHub CSV."""
     if GLOSSARIO_KEY not in st.session_state:
-        st.session_state[GLOSSARIO_KEY] = {}
+        # Seed from the CSV file in the repo (if it exists)
+        seed = load_glossario_csv_from_github()
+        st.session_state[GLOSSARIO_KEY] = seed
     return st.session_state[GLOSSARIO_KEY]
 
 def save_glossario(glossario_dict):
@@ -688,48 +705,42 @@ with tab5:
 
     glossario = load_glossario()
 
-    # ── Top toolbar: import / export / stats ─────────────────────────────────
-    toolbar_l, toolbar_r = st.columns([2, 1])
-    with toolbar_l:
-        st.markdown(
-            f"O glossário guarda a classificação de Formato de cada SKU de forma **persistente**. "
-            f"Actualmente tem **{len(glossario)} classificações** guardadas."
-        )
-    with toolbar_r:
-        if glossario:
-            gl_rows = []
-            for key_id, fmt in glossario.items():
-                pid, ret = key_id.rsplit("_", 1)
-                row_m = df_sku_list[(df_sku_list["PID"]==pid) & (df_sku_list["Retalhista"]==ret)]
-                r = row_m.iloc[0] if not row_m.empty else None
-                gl_rows.append({
-                    "PID": pid, "Retalhista": ret,
-                    "Nome": r["Nome"] if r is not None and pd.notna(r.get("Nome")) else "—",
-                    "Marca": r["Marca"] if r is not None and pd.notna(r.get("Marca")) else "—",
-                    "Quantidade": r["Quantidade"] if r is not None and pd.notna(r.get("Quantidade")) else "—",
-                    "Formato": fmt,
-                })
-            df_gl_export = pd.DataFrame(gl_rows)
-            csv_gl = df_gl_export.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Exportar glossário (CSV)", csv_gl,
-                               file_name="glossario_formato.csv", mime="text/csv",
-                               key="dl_glossario", use_container_width=True)
+    # ── Build export CSV (always, even if empty) ─────────────────────────────
+    gl_rows = []
+    for key_id, fmt in glossario.items():
+        pid, ret = key_id.rsplit("_", 1)
+        row_m = df_sku_list[(df_sku_list["PID"]==pid) & (df_sku_list["Retalhista"]==ret)]
+        r = row_m.iloc[0] if not row_m.empty else None
+        gl_rows.append({
+            "PID":        pid,
+            "Retalhista": ret,
+            "Nome":       r["Nome"]       if r is not None and pd.notna(r.get("Nome"))       else "",
+            "Marca":      r["Marca"]      if r is not None and pd.notna(r.get("Marca"))      else "",
+            "Quantidade": r["Quantidade"] if r is not None and pd.notna(r.get("Quantidade")) else "",
+            "Formato":    fmt,
+        })
+    df_gl_export = pd.DataFrame(gl_rows) if gl_rows else pd.DataFrame(
+        columns=["PID","Retalhista","Nome","Marca","Quantidade","Formato"])
+    csv_gl = df_gl_export.to_csv(index=False).encode("utf-8")
 
-    # ── Import CSV ────────────────────────────────────────────────────────────
-    with st.expander("📥 Importar glossário de ficheiro CSV"):
-        st.markdown(
-            "Carrega um CSV com colunas `PID`, `Retalhista`, `Formato`. "
-            "As classificações importadas são **adicionadas** ao glossário existente."
-        )
-        csv_up = st.file_uploader("CSV do glossário", type=["csv"], key="csv_import")
-        if csv_up:
-            n_imp = import_glossario_csv(csv_up)
-            if isinstance(n_imp, int):
-                st.success(f"✅ {n_imp} classificações importadas!")
-                glossario = load_glossario()
-                st.rerun()
-            else:
-                st.error(n_imp)
+    # ── Top bar ───────────────────────────────────────────────────────────────
+    st.markdown(
+        "Classifica os SKUs abaixo e clica no botão **Descarregar glossário** para guardar o CSV. "
+        "Faz depois o upload desse ficheiro para o GitHub com o nome exacto **`glossario_formato.csv`** "
+        "— o app carrega-o automaticamente ao arrancar."
+    )
+    st.markdown(f"Actualmente tem **{len(glossario)} classificações** no glossário desta sessão.")
+
+    st.download_button(
+        label="⬇️ Descarregar glossário (glossario_formato.csv)",
+        data=csv_gl,
+        file_name="glossario_formato.csv",
+        mime="text/csv",
+        key="dl_glossario",
+        use_container_width=True,
+        type="primary",
+    )
+    st.caption("ℹ️ Após descarregar, faz upload do ficheiro para o repositório GitHub. O app lê-o automaticamente ao arrancar.")
 
     st.markdown("---")
 
