@@ -98,6 +98,7 @@ def load_data(source):
     if not sheets: return pd.DataFrame()
     df_all = pd.concat(sheets.values(), ignore_index=True)
     df_all["Data"] = pd.to_datetime(df_all["Data"])
+    df_all["PID"] = df_all["PID"].astype(str)  # normalise PID type
     df_all = df_all.sort_values("Data").drop_duplicates(subset=["PID","Retalhista","Data"], keep="last")
     return df_all
 
@@ -225,6 +226,7 @@ def build_classifications(df_input):
         grp = grp.sort_values("Data")
         cls = classify_sku(grp["Preco"].tolist())
         m = grp.iloc[0]
+        pid = str(pid)  # normalise to str
         has_high = cls["alerta"] and any("High" in a["tipo"] for a in cls["alerta"])
         has_low  = cls["alerta"] and any("Low"  in a["tipo"] for a in cls["alerta"])
         alert_label = None
@@ -279,6 +281,7 @@ with st.sidebar:
 
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 sku_cls   = build_classifications(df)
+sku_cls["PID"] = sku_cls["PID"].astype(str)  # normalise PID type throughout
 
 # ── Formato lookup — built from glossário + SKU list ─────────────────────
 df_sku_list   = load_sku_list_from_excel(data_source)
@@ -338,11 +341,12 @@ with tab1:
         st.info(f"Nenhum produto novo nos últimos {new_prod_days} dias.")
     else:
         latest_price = df.sort_values("Data").groupby(["PID","Retalhista"]).last()[["Preco","Nome","Marca","Quantidade"]].reset_index()
+        new_products["PID"] = new_products["PID"].astype(str)
+        latest_price["PID"] = latest_price["PID"].astype(str)
         new_products = new_products.merge(latest_price, on=["PID","Retalhista"])
         new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
         new_products = new_products.sort_values(["Primeira_Leitura","Retalhista"], ascending=[False,True])
         # Add Formato from static lookup
-        new_products["PID"] = new_products["PID"].astype(str)
         new_products = new_products.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
         st.markdown(f"**{len(new_products)} produto(s) encontrado(s)**")
         for ret in RETAILER_ORDER:
@@ -566,7 +570,9 @@ with tab3:
 
     all_sum = (df3.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
                .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
-    cls_m = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alert_Label"]]
+    cls_m = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alert_Label"]].copy()
+    cls_m["PID"] = cls_m["PID"].astype(str)
+    all_sum["PID"] = all_sum["PID"].astype(str)
     all_sum = all_sum.merge(cls_m, on=["PID","Retalhista"], how="left")
     # Merge Formato from static lookup (robust to cache/column-missing issues)
     all_sum["PID"] = all_sum["PID"].astype(str)
@@ -631,7 +637,8 @@ with tab4:
 
     # Apply strategy filter via sku_cls
     if g_tipo:
-        valid_skus = sku_cls[sku_cls["Tipo_Preco"].isin(g_tipo)][["PID","Retalhista"]]
+        valid_skus = sku_cls[sku_cls["Tipo_Preco"].isin(g_tipo)][["PID","Retalhista"]].copy()
+        valid_skus["PID"] = valid_skus["PID"].astype(str)
         dg = dg.merge(valid_skus, on=["PID","Retalhista"])
 
     n_skus_g = dg.groupby(["PID","Retalhista"]).ngroups
