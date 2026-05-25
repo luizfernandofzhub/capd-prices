@@ -263,14 +263,19 @@ with tab1:
         new_products = new_products.merge(latest_price, on=["PID","Retalhista"])
         new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
         new_products = new_products.sort_values(["Primeira_Leitura","Retalhista"], ascending=[False,True])
+        # Add Formato
+        fmt_map1 = df_sku_meta[["PID","Retalhista","Formato"]].copy()
+        fmt_map1["PID"] = fmt_map1["PID"].astype(str)
+        new_products["PID"] = new_products["PID"].astype(str)
+        new_products = new_products.merge(fmt_map1, on=["PID","Retalhista"], how="left")
         st.markdown(f"**{len(new_products)} produto(s) encontrado(s)**")
         for ret in RETAILER_ORDER:
             sub = new_products[new_products["Retalhista"]==ret]
             if sub.empty: continue
             color = RETAILER_COLORS.get(ret,"#333")
             st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} novos</span>", unsafe_allow_html=True)
-            d = sub[["PID","Nome","Marca","Quantidade","Preco","Primeira_Leitura"]].copy()
-            d.columns = ["ID","Nome","Marca","Quantidade","Preço atual (€)","1ª Leitura"]
+            d = sub[["PID","Nome","Marca","Quantidade","Formato","Preco","Primeira_Leitura"]].copy()
+            d.columns = ["ID","Nome","Marca","Quantidade","Formato","Preço atual (€)","1ª Leitura"]
             d["1ª Leitura"] = d["1ª Leitura"].dt.strftime("%d/%m/%Y")
             d["Preço atual (€)"] = d["Preço atual (€)"].map("{:.2f} €".format)
             st.dataframe(d, use_container_width=True, hide_index=True)
@@ -316,6 +321,12 @@ with tab2:
     if alert_type2:  cf = cf[cf["Alert_Label"].isin(alert_type2)]
     cf["_ro"] = cf["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
     cf = cf.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
+    # Ensure Formato is in cf
+    if "Formato" not in cf.columns:
+        fmt_map2 = df_sku_meta[["PID","Retalhista","Formato"]].copy()
+        fmt_map2["PID"] = fmt_map2["PID"].astype(str)
+        cf["PID"] = cf["PID"].astype(str)
+        cf = cf.merge(fmt_map2, on=["PID","Retalhista"], how="left")
 
     # ── KPIs ──
     n_pu2 = (cf["Tipo_Preco"]=="Preço Único").sum()
@@ -385,9 +396,10 @@ with tab2:
                 all_als = new_highs + new_lows
                 new_prof_str = f'{all_als[-1]["prof_nova"]:.1f}%' if all_als else "—"
 
+            fmt_val = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
             rows_display.append({
                 "PID":row["PID"], "Nome":row["Nome"], "Marca":row["Marca"],
-                "Quantidade":row["Quantidade"],
+                "Quantidade":row["Quantidade"], "Formato": fmt_val if pd.notna(fmt_val) else "—",
                 "Estratégia":row["Tipo_Preco"],
                 "High":high_str, "Low":low_str, "Prof.%":prof_str,
                 "Novo High":new_h_str, "Novo Low":new_l_str, "Nova Prof.%":new_prof_str,
@@ -400,7 +412,7 @@ with tab2:
         left_col, right_col = st.columns([3,2])
         with left_col:
             sel = st.dataframe(
-                df_display[["PID","Nome","Marca","Quantidade","Estratégia","High","Low","Prof.%","Novo High","Novo Low","Nova Prof.%","Alerta"]],
+                df_display[["PID","Nome","Marca","Quantidade","Formato","Estratégia","High","Low","Prof.%","Novo High","Novo Low","Nova Prof.%","Alerta"]],
                 use_container_width=True, hide_index=True,
                 on_select="rerun", selection_mode="single-row",
                 key=f"tbl_{ret}",
@@ -475,6 +487,11 @@ with tab3:
                .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
     cls_m = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alert_Label"]]
     all_sum = all_sum.merge(cls_m, on=["PID","Retalhista"], how="left")
+    # Merge Formato once at the aggregate level (PID+Retalhista key, same types)
+    fmt_map = df_sku_meta[["PID","Retalhista","Formato"]].copy()
+    fmt_map["PID"] = fmt_map["PID"].astype(str)
+    all_sum["PID"] = all_sum["PID"].astype(str)
+    all_sum = all_sum.merge(fmt_map, on=["PID","Retalhista"], how="left")
     all_sum["Prof_Promo"] = all_sum["Prof_Promo"].fillna(
         ((1-all_sum["Preco_Min"]/all_sum["Preco_Max"])*100).round(1))
     all_sum["_ro"] = all_sum["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
@@ -486,11 +503,7 @@ with tab3:
         if sub.empty: continue
         color = RETAILER_COLORS.get(ret,"#333")
         st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} SKUs</span>", unsafe_allow_html=True)
-        d = sub[["PID","Nome","Marca","Quantidade","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]].copy()
-        # Add Formato from meta
-        meta_fmt = df_sku_meta[df_sku_meta["Retalhista"]==ret][["PID","Formato"]]
-        d = d.merge(meta_fmt, on="PID", how="left")
-        d = d[["PID","Nome","Marca","Quantidade","Formato","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]]
+        d = sub[["PID","Nome","Marca","Quantidade","Formato","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]].copy()
         d.columns = ["ID","Nome","Marca","Tamanho","Formato","Estratégia","Preço Atual €","Mín €","Máx €","Prof. Promo %","Alerta","Leituras"]
         d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
         d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
