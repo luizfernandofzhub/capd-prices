@@ -101,6 +101,29 @@ def load_data(source):
     df_all = df_all.sort_values("Data").drop_duplicates(subset=["PID","Retalhista","Data"], keep="last")
     return df_all
 
+@st.cache_data(ttl=300)
+def load_formato_lookup(source):
+    """Load a static PID→Formato map directly from the Excel meta columns,
+    completely independent of the tidy time-series dataframe."""
+    xl = pd.ExcelFile(source)
+    frames = []
+    for name in ["Continente","Auchan","PingoDoce"]:
+        if name not in xl.sheet_names: continue
+        df_raw = xl.parse(name)
+        if "Formato" not in df_raw.columns: continue
+        meta = df_raw[["PID","Formato"]].copy()
+        meta["PID"] = meta["PID"].astype(str)
+        meta["Retalhista"] = name
+        # Convert ArrowStringArray / object NA → plain Python None
+        meta["Formato"] = meta["Formato"].apply(
+            lambda x: str(x) if (x is not None and str(x) not in ("nan","<NA>","None","")) else None
+        )
+        frames.append(meta)
+    if not frames:
+        return pd.DataFrame(columns=["PID","Retalhista","Formato"])
+    return pd.concat(frames, ignore_index=True)
+
+
 # ── Classification logic ───────────────────────────────────────────────────────
 def classify_sku(price_series, outlier_min_count=3, outlier_min_pct=5.0):
     prices = [float(p) for p in price_series if pd.notna(p)]
@@ -207,6 +230,9 @@ with st.sidebar:
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 sku_cls   = build_classifications(df)
 
+# ── Formato lookup — independent static read ─────────────────────────────
+df_fmt_lookup = load_formato_lookup(data_source)
+
 # ── SKU static metadata (one row per PID×Retalhista, with Formato) ──────
 df_sku_meta = (df.sort_values("Data")
                .drop_duplicates(subset=["PID","Retalhista"], keep="last")
@@ -263,11 +289,9 @@ with tab1:
         new_products = new_products.merge(latest_price, on=["PID","Retalhista"])
         new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
         new_products = new_products.sort_values(["Primeira_Leitura","Retalhista"], ascending=[False,True])
-        # Add Formato
-        fmt_map1 = df_sku_meta[["PID","Retalhista","Formato"]].copy()
-        fmt_map1["PID"] = fmt_map1["PID"].astype(str)
+        # Add Formato from static lookup
         new_products["PID"] = new_products["PID"].astype(str)
-        new_products = new_products.merge(fmt_map1, on=["PID","Retalhista"], how="left")
+        new_products = new_products.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
         st.markdown(f"**{len(new_products)} produto(s) encontrado(s)**")
         for ret in RETAILER_ORDER:
             sub = new_products[new_products["Retalhista"]==ret]
@@ -276,6 +300,7 @@ with tab1:
             st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} novos</span>", unsafe_allow_html=True)
             d = sub[["PID","Nome","Marca","Quantidade","Formato","Preco","Primeira_Leitura"]].copy()
             d.columns = ["ID","Nome","Marca","Quantidade","Formato","Preço atual (€)","1ª Leitura"]
+            d["Formato"] = d["Formato"].fillna("—")
             d["1ª Leitura"] = d["1ª Leitura"].dt.strftime("%d/%m/%Y")
             d["Preço atual (€)"] = d["Preço atual (€)"].map("{:.2f} €".format)
             st.dataframe(d, use_container_width=True, hide_index=True)
@@ -321,12 +346,11 @@ with tab2:
     if alert_type2:  cf = cf[cf["Alert_Label"].isin(alert_type2)]
     cf["_ro"] = cf["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
     cf = cf.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
-    # Ensure Formato is in cf
-    if "Formato" not in cf.columns:
-        fmt_map2 = df_sku_meta[["PID","Retalhista","Formato"]].copy()
-        fmt_map2["PID"] = fmt_map2["PID"].astype(str)
-        cf["PID"] = cf["PID"].astype(str)
-        cf = cf.merge(fmt_map2, on=["PID","Retalhista"], how="left")
+    # Ensure Formato is in cf (always merge from static lookup)
+    cf["PID"] = cf["PID"].astype(str)
+    if "Formato" in cf.columns:
+        cf = cf.drop(columns=["Formato"])
+    cf = cf.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
 
     # ── KPIs ──
     n_pu2 = (cf["Tipo_Preco"]=="Preço Único").sum()
@@ -396,7 +420,8 @@ with tab2:
                 all_als = new_highs + new_lows
                 new_prof_str = f'{all_als[-1]["prof_nova"]:.1f}%' if all_als else "—"
 
-            fmt_val = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
+            _fv = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
+            fmt_val = str(_fv) if (_fv is not None and str(_fv) not in ("nan","<NA>","None","")) else "—"
             rows_display.append({
                 "PID":row["PID"], "Nome":row["Nome"], "Marca":row["Marca"],
                 "Quantidade":row["Quantidade"], "Formato": fmt_val if pd.notna(fmt_val) else "—",
@@ -487,11 +512,9 @@ with tab3:
                .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
     cls_m = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alert_Label"]]
     all_sum = all_sum.merge(cls_m, on=["PID","Retalhista"], how="left")
-    # Merge Formato once at the aggregate level (PID+Retalhista key, same types)
-    fmt_map = df_sku_meta[["PID","Retalhista","Formato"]].copy()
-    fmt_map["PID"] = fmt_map["PID"].astype(str)
+    # Merge Formato from static lookup (robust to cache/column-missing issues)
     all_sum["PID"] = all_sum["PID"].astype(str)
-    all_sum = all_sum.merge(fmt_map, on=["PID","Retalhista"], how="left")
+    all_sum = all_sum.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
     all_sum["Prof_Promo"] = all_sum["Prof_Promo"].fillna(
         ((1-all_sum["Preco_Min"]/all_sum["Preco_Max"])*100).round(1))
     all_sum["_ro"] = all_sum["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
@@ -509,6 +532,7 @@ with tab3:
         d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
         d["Máx €"]         = d["Máx €"].map("{:.2f}".format)
         d["Prof. Promo %"] = d["Prof. Promo %"].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x>0 else "—")
+        d["Formato"]       = d["Formato"].fillna("—")
         d["Alerta"]        = d["Alerta"].apply(lambda x: ("⚡ "+x) if pd.notna(x) and x else "")
         st.dataframe(d, use_container_width=True, hide_index=True)
 
