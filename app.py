@@ -48,6 +48,22 @@ h1, h2, h3 { font-family: 'DM Serif Display', serif; }
 .tag-cont  { background:#dbeafe; color:#1e40af; }
 .tag-auch  { background:#ede9fe; color:#5b21b6; }
 .tag-ping  { background:#fce7f3; color:#9d174d; }
+.tag-pu    { background:#e0f2fe; color:#0c4a6e; }
+.tag-hl    { background:#fef3c7; color:#92400e; }
+.tag-novo-high { background:#fce7f3; color:#9d174d; font-size:.75rem; padding:3px 10px; border-radius:6px; display:inline-block; }
+.tag-novo-low  { background:#fef9c3; color:#854d0e; font-size:.75rem; padding:3px 10px; border-radius:6px; display:inline-block; }
+.alert-box {
+    background:#fffbeb; border:1px solid #fbbf24;
+    border-left:4px solid #f59e0b;
+    border-radius:8px; padding:.8rem 1rem;
+    margin:.4rem 0;
+}
+.alert-box-high {
+    background:#fdf2f8; border:1px solid #f9a8d4;
+    border-left:4px solid #ec4899;
+    border-radius:8px; padding:.8rem 1rem;
+    margin:.4rem 0;
+}
 
 .retailer-badge {
     font-size:.8rem; font-weight:600; padding:3px 10px;
@@ -137,6 +153,102 @@ def badge(retailer):
     return f'<span class="retailer-badge" style="background:{color}22;color:{color}">{retailer}</span>'
 
 
+# ── Price classification logic ────────────────────────────────────────────────
+from collections import Counter as _Counter
+
+def classify_sku(price_series):
+    """Classify a SKU's pricing strategy and detect anomalous new prices."""
+    prices = [float(p) for p in price_series if pd.notna(p)]
+    n = len(prices)
+    if n == 0:
+        return {"tipo": "Sem dados", "preco_high": None, "preco_low": None,
+                "prof_promo": 0.0, "alerta": None}
+
+    cnt = _Counter(prices)
+    unique_prices = sorted(set(prices))
+
+    # ── Preço Único: dominant price ≥ 90% of readings ──
+    most_common_count = cnt.most_common(1)[0][1]
+    if most_common_count / n >= 0.90 or len(unique_prices) == 1:
+        return {"tipo": "Preço Único", "preco_high": max(prices),
+                "preco_low": None, "prof_promo": 0.0, "alerta": None}
+
+    # ── High-Low: find established high & low ──
+    median_price = float(np.median(prices))
+    highs = [p for p in unique_prices if p >= median_price]
+    lows  = [p for p in unique_prices if p <  median_price]
+    if not lows:
+        lows  = [min(unique_prices)]
+        highs = [p for p in unique_prices if p > min(unique_prices)]
+
+    est_high = max(highs, key=lambda p: cnt[p])
+    est_low  = max(lows,  key=lambda p: cnt[p])
+
+    known = {est_high, est_low}
+    new_prices = [p for p in unique_prices if p not in known]
+
+    prof = (1 - est_low / est_high) * 100 if est_high > 0 else 0.0
+
+    alerts = []
+    for np_ in new_prices:
+        dist_high = abs(np_ - est_high)
+        dist_low  = abs(np_ - est_low)
+        if np_ > est_high:
+            kind = "Novo High ↑"
+            old_val = est_high
+            new_prof = (1 - est_low / np_) * 100
+        elif np_ < est_low:
+            kind = "Novo Low ↓"
+            old_val = est_low
+            new_prof = (1 - np_ / est_high) * 100
+        elif dist_low <= dist_high:
+            kind = "Novo Low ↓"
+            old_val = est_low
+            new_prof = (1 - np_ / est_high) * 100
+        else:
+            kind = "Novo High ↑"
+            old_val = est_high
+            new_prof = (1 - est_low / np_) * 100
+        alerts.append({
+            "tipo": kind,
+            "preco_anterior": old_val,
+            "preco_novo": np_,
+            "prof_anterior": round(prof, 1),
+            "prof_nova": round(new_prof, 1),
+        })
+
+    return {
+        "tipo": "High-Low",
+        "preco_high": est_high,
+        "preco_low":  est_low,
+        "prof_promo": round(prof, 1),
+        "alerta": alerts if alerts else None,
+    }
+
+
+@st.cache_data(ttl=300)
+def build_classifications(df_input):
+    """Pre-compute pricing classification for every SKU using full history."""
+    records = []
+    for (pid, ret), grp in df_input.groupby(["PID", "Retalhista"]):
+        grp = grp.sort_values("Data")
+        cls = classify_sku(grp["Preco"].tolist())
+        row_meta = grp.iloc[0]
+        records.append({
+            "PID":        pid,
+            "Retalhista": ret,
+            "Nome":       row_meta["Nome"],
+            "Marca":      row_meta["Marca"],
+            "Quantidade": row_meta["Quantidade"],
+            "Tipo_Preco": cls["tipo"],
+            "Preco_High": cls["preco_high"],
+            "Preco_Low":  cls["preco_low"],
+            "Prof_Promo": cls["prof_promo"],
+            "Alertas":    cls["alerta"],        # list or None
+        })
+    return pd.DataFrame(records)
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ⚙️ Configuração")
@@ -205,6 +317,9 @@ with st.sidebar:
     )
 
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
+
+# Build SKU classifications from FULL history (not period-filtered)
+sku_cls = build_classifications(df)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -318,88 +433,151 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True, key="chart_1")
 
 # ─────────────────────────────────────────────────────────────────
-# TAB 2 — ANÁLISE DE PREÇOS
+# TAB 2 — ALERTA DE MUDANÇA DE PREÇO
 # ─────────────────────────────────────────────────────────────────
 with tab2:
     st.markdown('<div class="section-header">📈 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
+    st.markdown("Classificação de estratégia de preço e alertas de novos High/Low detectados no histórico completo.")
 
-    # Per (PID, Retalhista) compute min / max / unique prices
-    summary = (
-        df_period.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
-        .agg(
-            Minimo="min",
-            Maximo="max",
-            Leituras="count",
-            Precos_Distintos=lambda x: x.nunique(),
-        )
-        .reset_index()
-    )
-    summary["Variacao_Pct"] = ((summary["Maximo"] - summary["Minimo"]) / summary["Maximo"] * 100).round(1)
-    summary["Houve_Alteracao"] = summary["Precos_Distintos"] >= 3
-
-    st.markdown("SKUs que apresentaram **mais do que 2 preços históricos** no período seleccionado.")
-
-    c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
-    with c1:
-        show_changed = st.checkbox("🔴 Produtos com 3+ preços registrados", value=False)
-    with c2:
+    # ── Filters ──
+    fa2, fb2, fc2 = st.columns([1, 1, 2])
+    with fa2:
         ret_filter_tab2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret_tab2")
-    with c3:
-        brand_filter = st.multiselect("Marca", sorted(summary["Marca"].unique()), key="brand_tab2")
+    with fb2:
+        brand_filter_tab2 = st.multiselect("Marca", sorted(sku_cls["Marca"].unique()), key="brand_tab2")
+    with fc2:
+        search_tab2 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's", key="search_tab2")
 
-    search = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's")
+    ca2, cb2 = st.columns(2)
+    with ca2:
+        show_alerts_only = st.checkbox("🚨 Apenas SKUs com alertas (Novo High / Novo Low)", value=False)
+    with cb2:
+        show_hl_only = st.checkbox("🔁 Apenas SKUs High-Low", value=False)
 
-    filtered = summary.copy()
-    if show_changed:
-        filtered = filtered[filtered["Precos_Distintos"] >= 3]
-    if ret_filter_tab2:
-        filtered = filtered[filtered["Retalhista"].isin(ret_filter_tab2)]
-    if brand_filter:
-        filtered = filtered[filtered["Marca"].isin(brand_filter)]
-    if search:
-        filtered = filtered[filtered["Nome"].str.contains(search, case=False, na=False)]
-
+    # ── Apply filters ──
     RETAILER_ORDER = ["Continente", "PingoDoce", "Auchan"]
-    filtered["_ret_order"] = filtered["Retalhista"].map({r: i for i, r in enumerate(RETAILER_ORDER)}).fillna(99)
-    filtered = filtered.sort_values(["_ret_order", "Marca", "Nome"]).drop(columns=["_ret_order"])
+    cls_filtered = sku_cls.copy()
+    if ret_filter_tab2:
+        cls_filtered = cls_filtered[cls_filtered["Retalhista"].isin(ret_filter_tab2)]
+    if brand_filter_tab2:
+        cls_filtered = cls_filtered[cls_filtered["Marca"].isin(brand_filter_tab2)]
+    if search_tab2:
+        cls_filtered = cls_filtered[cls_filtered["Nome"].str.contains(search_tab2, case=False, na=False)]
+    if show_alerts_only:
+        cls_filtered = cls_filtered[cls_filtered["Alertas"].notna()]
+    if show_hl_only:
+        cls_filtered = cls_filtered[cls_filtered["Tipo_Preco"] == "High-Low"]
 
-    # Display grouped by retailer
-    current_ret = None
-    for _, row in filtered.head(200).iterrows():
-        if row["Retalhista"] != current_ret:
-            current_ret = row["Retalhista"]
-            color = RETAILER_COLORS.get(current_ret, "#333")
-            st.markdown(f"#### {current_ret}", unsafe_allow_html=True)
-        changed_html = (
-            '<span class="tag tag-alert">⚠️ Alterou</span>'
-            if row["Houve_Alteracao"]
-            else '<span class="tag tag-new">✔ Estável</span>'
+    cls_filtered["_ro"] = cls_filtered["Retalhista"].map({r: i for i, r in enumerate(RETAILER_ORDER)}).fillna(99)
+    cls_filtered = cls_filtered.sort_values(["_ro", "Marca", "Nome"]).drop(columns=["_ro"])
+
+    # ── Summary KPIs ──
+    n_pu    = (cls_filtered["Tipo_Preco"] == "Preço Único").sum()
+    n_hl    = (cls_filtered["Tipo_Preco"] == "High-Low").sum()
+    n_alert = cls_filtered["Alertas"].notna().sum()
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.markdown(f'<div class="metric-card"><h4>Total SKUs</h4><p>{len(cls_filtered)}</p></div>', unsafe_allow_html=True)
+    k2.markdown(f'<div class="metric-card" style="border-color:#0284c7"><h4>Preço Único</h4><p>{n_pu}</p></div>', unsafe_allow_html=True)
+    k3.markdown(f'<div class="metric-card" style="border-color:#d97706"><h4>High-Low</h4><p>{n_hl}</p></div>', unsafe_allow_html=True)
+    k4.markdown(f'<div class="metric-card" style="border-color:#dc2626"><h4>Com Alertas</h4><p>{n_alert}</p></div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Display grouped by retailer ──
+    current_ret2 = None
+    for _, row in cls_filtered.iterrows():
+        if row["Retalhista"] != current_ret2:
+            current_ret2 = row["Retalhista"]
+            color = RETAILER_COLORS.get(current_ret2, "#333")
+            sub_ret = cls_filtered[cls_filtered["Retalhista"] == current_ret2]
+            st.markdown(f"#### {current_ret2} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub_ret)} SKUs</span>", unsafe_allow_html=True)
+
+        tipo = row["Tipo_Preco"]
+        alertas = row["Alertas"]
+        has_alert = alertas is not None and len(alertas) > 0
+
+        # Build expander label with badges
+        tipo_badge = (
+            '<span class="tag tag-pu">💰 Preço Único</span>'
+            if tipo == "Preço Único"
+            else '<span class="tag tag-hl">🔁 High-Low</span>'
         )
-        ret_html = badge(row["Retalhista"])
-        with st.expander(f"{row['Nome']} — {row['Marca']}  |  {row['Retalhista']}"):
-            c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric("Mínimo", f"{row['Minimo']:.2f} €")
-            c2.metric("Máximo", f"{row['Maximo']:.2f} €")
-            c3.metric("Variação", f"{row['Variacao_Pct']:.1f}%")
-            c4.metric("Preços distintos", int(row["Precos_Distintos"]))
-            c5.metric("Leituras", int(row["Leituras"]))
+        alert_badge = '<span class="tag tag-alert">🚨 Alerta</span>' if has_alert else ""
+        expander_label = f"{row['Nome']} — {row['Marca']} | {tipo}"
+        if has_alert:
+            expander_label += "  ⚠️"
 
-            # Price evolution chart for this product
-            sub = df_period[(df_period["PID"] == row["PID"]) & (df_period["Retalhista"] == row["Retalhista"])]
-            sub = sub.sort_values("Data")
-            if len(sub) > 1:
+        with st.expander(expander_label, expanded=has_alert):
+            # ── Metrics row ──
+            if tipo == "Preço Único":
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Estratégia", "Preço Único")
+                m2.metric("Preço", f"{row['Preco_High']:.2f} €" if row['Preco_High'] else "—")
+                m3.metric("Prof. Promo", "0%")
+            else:
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Estratégia", "High-Low")
+                m2.metric("High (sem promo)", f"{row['Preco_High']:.2f} €" if row['Preco_High'] else "—")
+                m3.metric("Low (com promo)", f"{row['Preco_Low']:.2f} €" if row['Preco_Low'] else "—")
+                m4.metric("Prof. Promocional", f"{row['Prof_Promo']:.1f}%")
+
+            # ── Alert boxes ──
+            if has_alert:
+                st.markdown("**Alertas detectados:**")
+                for al in alertas:
+                    is_high = "High" in al["tipo"]
+                    box_class = "alert-box-high" if is_high else "alert-box"
+                    icon = "📈" if is_high else "📉"
+                    direction = "subida" if is_high else "redução"
+                    prof_delta = al["prof_nova"] - al["prof_anterior"]
+                    prof_txt = (
+                        f"+{prof_delta:.1f}pp (profundidade aumentou)" if prof_delta > 0
+                        else f"{prof_delta:.1f}pp (profundidade reduziu)"
+                    )
+                    st.markdown(f"""
+<div class="{box_class}">
+{icon} <strong>{al["tipo"]}</strong> — {direction} de preço detectada<br>
+&nbsp;&nbsp;Preço anterior: <strong>{al["preco_anterior"]:.2f} €</strong> → Novo preço: <strong>{al["preco_novo"]:.2f} €</strong><br>
+&nbsp;&nbsp;Prof. promo anterior: <strong>{al["prof_anterior"]:.1f}%</strong> → Nova: <strong>{al["prof_nova"]:.1f}%</strong> &nbsp; <em>({prof_txt})</em>
+</div>""", unsafe_allow_html=True)
+
+            # ── Price history chart ──
+            sub_hist = df[(df["PID"] == row["PID"]) & (df["Retalhista"] == row["Retalhista"])].sort_values("Data")
+            if len(sub_hist) > 1:
                 fig = go.Figure()
+                # Add shaded bands for High and Low
+                if tipo == "High-Low" and row["Preco_High"] and row["Preco_Low"]:
+                    fig.add_hrect(y0=row["Preco_Low"]*0.99, y1=row["Preco_High"]*1.01,
+                                  fillcolor="rgba(234,179,8,0.07)", line_width=0,
+                                  annotation_text="range H-L", annotation_position="top right")
+                    fig.add_hline(y=row["Preco_High"], line_dash="dot",
+                                  line_color="rgba(220,38,38,0.5)", annotation_text=f"High {row['Preco_High']:.2f}€")
+                    fig.add_hline(y=row["Preco_Low"],  line_dash="dot",
+                                  line_color="rgba(22,163,74,0.5)",  annotation_text=f"Low {row['Preco_Low']:.2f}€")
                 fig.add_trace(go.Scatter(
-                    x=sub["Data"], y=sub["Preco"],
+                    x=sub_hist["Data"], y=sub_hist["Preco"],
                     mode="lines+markers",
                     line=dict(color=RETAILER_COLORS.get(row["Retalhista"], "#333"), width=2),
                     marker=dict(size=6),
                     name="Preço",
                 ))
+                # Mark anomalous prices
+                if has_alert:
+                    alert_prices = {al["preco_novo"] for al in alertas}
+                    anomaly = sub_hist[sub_hist["Preco"].isin(alert_prices)]
+                    if not anomaly.empty:
+                        fig.add_trace(go.Scatter(
+                            x=anomaly["Data"], y=anomaly["Preco"],
+                            mode="markers",
+                            marker=dict(size=12, color="#f59e0b", symbol="diamond",
+                                        line=dict(color="#1a1a1a", width=1.5)),
+                            name="Preço novo",
+                        ))
                 fig.update_layout(
-                    height=200, margin=dict(t=10,b=10,l=10,r=10),
+                    height=220, margin=dict(t=20,b=10,l=10,r=10),
                     yaxis_title="€", xaxis_title="",
                     template="plotly_white",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02),
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"chart_tab2_{row['PID']}_{row['Retalhista']}")
 
@@ -454,9 +632,16 @@ with tab3:
         )
         .reset_index()
     )
-    # Profundidade promocional: (1 - Min/Max) * 100
-    all_summary["Prof_Promo_Pct"] = ((1 - all_summary["Preco_Min"] / all_summary["Preco_Max"]) * 100).round(1)
-    all_summary.loc[all_summary["Preco_Max"] == all_summary["Preco_Min"], "Prof_Promo_Pct"] = 0.0
+    # Merge classification from full-history sku_cls
+    cls_merge = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alertas"]]
+    all_summary = all_summary.merge(cls_merge, on=["PID","Retalhista"], how="left")
+
+    # Profundidade promocional: use classify_sku Prof_Promo; fallback to period calc
+    all_summary["Prof_Promo_Pct"] = all_summary["Prof_Promo"].fillna(
+        ((1 - all_summary["Preco_Min"] / all_summary["Preco_Max"]) * 100).round(1)
+    )
+    all_summary["Prof_Promo_Pct"] = all_summary["Prof_Promo_Pct"].round(1)
+    all_summary["Tem_Alerta"] = all_summary["Alertas"].notna()
 
     # Sort: retailer order then brand then name
     RET_ORD = ["Continente", "PingoDoce", "Auchan"]
@@ -473,12 +658,16 @@ with tab3:
         color = RETAILER_COLORS.get(ret, "#333")
         st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} SKUs</span>", unsafe_allow_html=True)
 
-        display_all = sub[["PID","Nome","Marca","Quantidade","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo_Pct","Leituras"]].copy()
-        display_all.columns = ["ID","Nome","Marca","Tamanho","Preço Atual (€)","Preço Mín (€)","Preço Máx (€)","Prof. Promo (%)","Leituras"]
+        display_all = sub[["PID","Nome","Marca","Quantidade","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo_Pct","Tem_Alerta","Leituras"]].copy()
+        display_all.columns = ["ID","Nome","Marca","Tamanho","Estratégia","Preço Atual (€)","Preço Mín (€)","Preço Máx (€)","Prof. Promo (%)","Alerta","Leituras"]
         display_all["Preço Atual (€)"] = display_all["Preço Atual (€)"].map("{:.2f}".format)
         display_all["Preço Mín (€)"]   = display_all["Preço Mín (€)"].map("{:.2f}".format)
         display_all["Preço Máx (€)"]   = display_all["Preço Máx (€)"].map("{:.2f}".format)
-        display_all["Prof. Promo (%)"] = display_all["Prof. Promo (%)"].map("{:.1f}%".format)
+        display_all["Prof. Promo (%)"] = display_all["Prof. Promo (%)"].apply(
+            lambda x: f"{x:.1f}%" if x > 0 else "—"
+        )
+        display_all["Estratégia"] = display_all["Estratégia"].fillna("—")
+        display_all["Alerta"] = display_all["Alerta"].apply(lambda x: "🚨 Sim" if x else "")
         st.dataframe(display_all, use_container_width=True, hide_index=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
