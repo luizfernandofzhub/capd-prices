@@ -101,27 +101,77 @@ def load_data(source):
     df_all = df_all.sort_values("Data").drop_duplicates(subset=["PID","Retalhista","Data"], keep="last")
     return df_all
 
+GLOSSARIO_KEY = "glossario_formato_v1"
+FORMATO_OPTIONS = ["Bars","Bites","Bites - PromoPack","Cakes","Cones","Cups",
+                   "Frozen Fruits","Other","Pints","Pints - PromoPack",
+                   "Pots","Sandwich","Sticks","Tubs"]
+
+def load_glossario():
+    """Load the persisted glossário from session_state (backed by st.cache_resource trick).
+    Returns a dict {'PID_Retalhista': 'Formato'}."""
+    if GLOSSARIO_KEY not in st.session_state:
+        st.session_state[GLOSSARIO_KEY] = {}
+    return st.session_state[GLOSSARIO_KEY]
+
+def save_glossario(glossario_dict):
+    """Save the glossário dict back to session_state."""
+    st.session_state[GLOSSARIO_KEY] = glossario_dict
+
+def glossario_to_df(glossario_dict):
+    """Convert glossário dict to a PID/Retalhista/Formato DataFrame."""
+    rows = []
+    for key, fmt in glossario_dict.items():
+        parts = key.rsplit("_", 1)
+        if len(parts) == 2:
+            rows.append({"PID": parts[0], "Retalhista": parts[1], "Formato": fmt})
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["PID","Retalhista","Formato"])
+
+def import_glossario_csv(uploaded_csv):
+    """Import a glossário CSV and merge into the persisted dict."""
+    try:
+        df_csv = pd.read_csv(uploaded_csv)
+        df_csv["PID"] = df_csv["PID"].astype(str)
+        glossario = load_glossario()
+        imported = 0
+        for _, row in df_csv.iterrows():
+            if pd.notna(row.get("Formato")) and str(row.get("Formato","")) not in ("","nan"):
+                key = f"{row['PID']}_{row['Retalhista']}"
+                glossario[key] = str(row["Formato"])
+                imported += 1
+        save_glossario(glossario)
+        return imported
+    except Exception as e:
+        return f"Erro: {e}"
+
 @st.cache_data(ttl=300)
-def load_formato_lookup(source):
-    """Load a static PID→Formato map directly from the Excel meta columns,
-    completely independent of the tidy time-series dataframe."""
+def load_sku_list_from_excel(source):
+    """Load only the meta columns (PID, Nome, Marca, Quantidade) from the Excel.
+    Does NOT require a Formato column — that comes from the glossário."""
     xl = pd.ExcelFile(source)
     frames = []
     for name in ["Continente","Auchan","PingoDoce"]:
         if name not in xl.sheet_names: continue
         df_raw = xl.parse(name)
-        if "Formato" not in df_raw.columns: continue
-        meta = df_raw[["PID","Formato"]].copy()
+        meta_cols = [c for c in ["PID","Nome","Marca","Quantidade"] if c in df_raw.columns]
+        meta = df_raw[meta_cols].copy()
         meta["PID"] = meta["PID"].astype(str)
         meta["Retalhista"] = name
-        # Convert ArrowStringArray / object NA → plain Python None
-        meta["Formato"] = meta["Formato"].apply(
-            lambda x: str(x) if (x is not None and str(x) not in ("nan","<NA>","None","")) else None
-        )
         frames.append(meta)
     if not frames:
-        return pd.DataFrame(columns=["PID","Retalhista","Formato"])
-    return pd.concat(frames, ignore_index=True)
+        return pd.DataFrame(columns=["PID","Retalhista","Nome","Marca","Quantidade"])
+    df_meta = pd.concat(frames, ignore_index=True)
+    df_meta = df_meta.drop_duplicates(subset=["PID","Retalhista"])
+    return df_meta
+
+def build_formato_lookup(glossario_dict, sku_list_df):
+    """Merge glossário into the SKU list to produce the final PID/Retalhista/Formato table."""
+    gl_df = glossario_to_df(glossario_dict)
+    if gl_df.empty:
+        result = sku_list_df[["PID","Retalhista"]].copy()
+        result["Formato"] = None
+        return result
+    merged = sku_list_df[["PID","Retalhista"]].merge(gl_df, on=["PID","Retalhista"], how="left")
+    return merged
 
 
 # ── Classification logic ───────────────────────────────────────────────────────
@@ -230,8 +280,10 @@ with st.sidebar:
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 sku_cls   = build_classifications(df)
 
-# ── Formato lookup — independent static read ─────────────────────────────
-df_fmt_lookup = load_formato_lookup(data_source)
+# ── Formato lookup — built from glossário + SKU list ─────────────────────
+df_sku_list   = load_sku_list_from_excel(data_source)
+_glossario    = load_glossario()
+df_fmt_lookup = build_formato_lookup(_glossario, df_sku_list)
 
 # ── SKU static metadata (one row per PID×Retalhista, with Formato) ──────
 df_sku_meta = (df.sort_values("Data")
@@ -321,13 +373,16 @@ with tab2:
     st.markdown('<div class="section-header">📈 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
 
     # ── Filters ──
-    f2a, f2b, f2c, f2d = st.columns([1,1,1,2])
+    f2a, f2b, f2c, f2e, f2d = st.columns([1,1,1,1,2])
     with f2a:
         ret2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
     with f2b:
         brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
     with f2c:
         tipo2 = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
+    with f2e:
+        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
+        fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
     with f2d:
         search2 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's", key="search2")
 
@@ -344,6 +399,7 @@ with tab2:
     if search2: cf = cf[cf["Nome"].str.contains(search2, case=False, na=False)]
     if only_alerts2: cf = cf[cf["Alert_Label"].notna()]
     if alert_type2:  cf = cf[cf["Alert_Label"].isin(alert_type2)]
+    if fmt2:         cf = cf[cf["Formato"].isin(fmt2)]
     cf["_ro"] = cf["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
     cf = cf.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
     # Ensure Formato is in cf (always merge from static lookup)
@@ -494,7 +550,7 @@ with tab3:
     with fc:
         f_size  = st.multiselect("Tamanho", sorted(df["Quantidade"].dropna().astype(str).unique()), key="f_size_all")
     with fe:
-        all_fmts = sorted(df["Formato"].dropna().unique()) if "Formato" in df.columns else []
+        all_fmts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
         f_fmt = st.multiselect("Formato", all_fmts, key="f_fmt_all")
     with fd:
         f_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="f_period_all")
@@ -506,7 +562,7 @@ with tab3:
     if f_brand:  df3 = df3[df3["Marca"].isin(f_brand)]
     if f_size:   df3 = df3[df3["Quantidade"].astype(str).isin(f_size)]
     if f_search3:df3 = df3[df3["Nome"].str.contains(f_search3, case=False, na=False)]
-    if f_fmt and "Formato" in df3.columns: df3 = df3[df3["Formato"].isin(f_fmt)]
+    # Formato filter applied after merge (see below)
 
     all_sum = (df3.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
                .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
@@ -515,6 +571,7 @@ with tab3:
     # Merge Formato from static lookup (robust to cache/column-missing issues)
     all_sum["PID"] = all_sum["PID"].astype(str)
     all_sum = all_sum.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+    if f_fmt: all_sum = all_sum[all_sum["Formato"].isin(f_fmt)]
     all_sum["Prof_Promo"] = all_sum["Prof_Promo"].fillna(
         ((1-all_sum["Preco_Min"]/all_sum["Preco_Max"])*100).round(1))
     all_sum["_ro"] = all_sum["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
@@ -553,7 +610,7 @@ with tab4:
     with g4:
         g_tipo  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="g_tipo")
     with g6:
-        g_fmts_avail = sorted(df["Formato"].dropna().unique()) if "Formato" in df.columns else []
+        g_fmts_avail = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
         g_fmt = st.multiselect("Formato", g_fmts_avail, key="g_fmt")
     with g5:
         g_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="g_period")
@@ -567,7 +624,10 @@ with tab4:
     if g_brand:  dg = dg[dg["Marca"].isin(g_brand)]
     if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
     if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
-    if g_fmt and "Formato" in dg.columns: dg = dg[dg["Formato"].isin(g_fmt)]
+    # Merge Formato for tab4 filter
+    dg["PID"] = dg["PID"].astype(str)
+    dg = dg.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+    if g_fmt: dg = dg[dg["Formato"].isin(g_fmt)]
 
     # Apply strategy filter via sku_cls
     if g_tipo:
@@ -617,108 +677,160 @@ with tab4:
 # TAB 5 — SKUs NÃO CLASSIFICADOS
 # ═══════════════════════════════════════════════════════════════════
 with tab5:
-    st.markdown('<div class="section-header">🏷️ SKUs não classificados</div>', unsafe_allow_html=True)
-    st.markdown(
-        "Lista de SKUs sem **Formato** definido no ficheiro Excel. "
-        "Classifica cada um abaixo usando a lista suspensa. "
-        "**Atenção:** as classificações feitas aqui são temporárias (ficam na sessão). "
-        "Para torná-las permanentes, exporta a tabela e actualiza o teu ficheiro Excel."
-    )
+    st.markdown('<div class="section-header">🏷️ Glossário de Formatos</div>', unsafe_allow_html=True)
 
-    FORMATO_OPTIONS = ["— seleccionar —", "Bars","Bites","Bites - PromoPack","Cakes",
-                       "Cones","Cups","Frozen Fruits","Other","Pints","Pints - PromoPack",
-                       "Pots","Sandwich","Sticks","Tubs"]
+    glossario = load_glossario()
 
-    # Get unclassified SKUs from df_sku_meta
-    unclass = df_sku_meta[df_sku_meta["Formato"].isna()].copy().reset_index(drop=True)
+    # ── Top toolbar: import / export / stats ─────────────────────────────────
+    toolbar_l, toolbar_r = st.columns([2, 1])
+    with toolbar_l:
+        st.markdown(
+            f"O glossário guarda a classificação de Formato de cada SKU de forma **persistente**. "
+            f"Actualmente tem **{len(glossario)} classificações** guardadas."
+        )
+    with toolbar_r:
+        if glossario:
+            gl_rows = []
+            for key_id, fmt in glossario.items():
+                pid, ret = key_id.rsplit("_", 1)
+                row_m = df_sku_list[(df_sku_list["PID"]==pid) & (df_sku_list["Retalhista"]==ret)]
+                r = row_m.iloc[0] if not row_m.empty else None
+                gl_rows.append({
+                    "PID": pid, "Retalhista": ret,
+                    "Nome": r["Nome"] if r is not None and pd.notna(r.get("Nome")) else "—",
+                    "Marca": r["Marca"] if r is not None and pd.notna(r.get("Marca")) else "—",
+                    "Quantidade": r["Quantidade"] if r is not None and pd.notna(r.get("Quantidade")) else "—",
+                    "Formato": fmt,
+                })
+            df_gl_export = pd.DataFrame(gl_rows)
+            csv_gl = df_gl_export.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Exportar glossário (CSV)", csv_gl,
+                               file_name="glossario_formato.csv", mime="text/csv",
+                               key="dl_glossario", use_container_width=True)
 
-    if unclass.empty:
-        st.success("✅ Todos os SKUs têm Formato definido!")
+    # ── Import CSV ────────────────────────────────────────────────────────────
+    with st.expander("📥 Importar glossário de ficheiro CSV"):
+        st.markdown(
+            "Carrega um CSV com colunas `PID`, `Retalhista`, `Formato`. "
+            "As classificações importadas são **adicionadas** ao glossário existente."
+        )
+        csv_up = st.file_uploader("CSV do glossário", type=["csv"], key="csv_import")
+        if csv_up:
+            n_imp = import_glossario_csv(csv_up)
+            if isinstance(n_imp, int):
+                st.success(f"✅ {n_imp} classificações importadas!")
+                glossario = load_glossario()
+                st.rerun()
+            else:
+                st.error(n_imp)
+
+    st.markdown("---")
+
+    # ── Build full SKU table with glossário applied ───────────────────────────
+    df_all_skus = df_sku_list.copy()
+    df_all_skus["key_id"] = df_all_skus["PID"].astype(str) + "_" + df_all_skus["Retalhista"]
+    df_all_skus["Formato"] = df_all_skus["key_id"].map(glossario)
+
+    n_total      = len(df_all_skus)
+    n_classified = df_all_skus["Formato"].notna().sum()
+    n_missing    = n_total - n_classified
+    pct = int(n_classified / n_total * 100) if n_total > 0 else 0
+    bar_color = "#16a34a" if pct == 100 else "#2563eb"
+
+    st.markdown(f"""
+<div style="margin-bottom:1rem;">
+  <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#666;margin-bottom:.3rem;">
+    <span>Classificações: <strong>{n_classified} / {n_total}</strong></span>
+    <span><strong>{pct}%</strong> completo</span>
+  </div>
+  <div style="background:#e5e7eb;border-radius:8px;height:10px;overflow:hidden;">
+    <div style="background:{bar_color};width:{pct}%;height:100%;border-radius:8px;"></div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+    if n_missing == 0:
+        st.success("✅ Todos os SKUs têm Formato classificado!")
     else:
-        # Filter by retailer
-        uc_ret = st.multiselect("Filtrar por retalhista", retailers_sel,
-                                 default=retailers_sel, key="uc_ret")
-        unclass = unclass[unclass["Retalhista"].isin(uc_ret)]
+        st.info(f"**{n_missing} SKU(s)** ainda sem classificação.")
 
-        st.markdown(f"**{len(unclass)} SKU(s) sem classificação** nos retalhistas seleccionados.")
-        st.markdown("---")
+    view_mode = st.radio("Mostrar:", ["Não classificados", "Todos os SKUs", "Apenas classificados"],
+                          horizontal=True, key="tab5_view")
+    uc_ret5 = st.multiselect("Filtrar por retalhista", retailers_sel,
+                              default=retailers_sel, key="uc_ret5")
 
-        # Session state to store temporary classifications
-        if "formato_temp" not in st.session_state:
-            st.session_state["formato_temp"] = {}
+    if view_mode == "Não classificados":
+        display_skus = df_all_skus[df_all_skus["Formato"].isna()]
+    elif view_mode == "Apenas classificados":
+        display_skus = df_all_skus[df_all_skus["Formato"].notna()]
+    else:
+        display_skus = df_all_skus.copy()
 
-        # Group by retailer
-        for ret in RETAILER_ORDER:
-            sub_uc = unclass[unclass["Retalhista"]==ret].copy()
-            if sub_uc.empty: continue
-            color = RETAILER_COLORS.get(ret,"#333")
-            st.markdown(
-                f"#### {ret} &nbsp; "
-                f"<span style='font-size:.85rem;color:{color}'>{len(sub_uc)} SKUs</span>",
-                unsafe_allow_html=True
-            )
-            for _, row in sub_uc.iterrows():
-                key_id = f"{row['PID']}_{ret}"
-                current = st.session_state["formato_temp"].get(key_id, "— seleccionar —")
-                nome_str = str(row["Nome"]) if pd.notna(row["Nome"]) else f"(sem nome · PID {row['PID']})"
-                marca_str = str(row["Marca"]) if pd.notna(row["Marca"]) else "—"
-                qtd_str   = str(row["Quantidade"]) if pd.notna(row["Quantidade"]) else "—"
+    display_skus = display_skus[display_skus["Retalhista"].isin(uc_ret5)]
+    st.markdown(f"**{len(display_skus)} SKU(s)** com os filtros actuais.")
+    st.markdown("---")
 
-                col_info, col_sel = st.columns([3, 1])
-                with col_info:
-                    info_line = f"**{nome_str}**  \n<span style='color:#888;font-size:.82rem'>Marca: {marca_str} · Qtd: {qtd_str} · PID: {row['PID']}</span>"
-                    st.markdown(info_line, unsafe_allow_html=True)
-                with col_sel:
-                    chosen = st.selectbox(
-                        "Formato",
-                        FORMATO_OPTIONS,
-                        index=FORMATO_OPTIONS.index(current) if current in FORMATO_OPTIONS else 0,
-                        key=f"fmt_sel_{key_id}",
-                        label_visibility="collapsed",
-                    )
-                    if chosen != "— seleccionar —":
-                        if st.session_state["formato_temp"].get(key_id) != chosen:
-                            st.session_state["formato_temp"][key_id] = chosen
-                            st.rerun()
+    SEL_OPTIONS = ["— seleccionar —"] + FORMATO_OPTIONS
 
-                # Show confirmation badge if classified
-                if current != "— seleccionar —":
+    for ret in RETAILER_ORDER:
+        sub_uc = display_skus[display_skus["Retalhista"]==ret].copy()
+        if sub_uc.empty: continue
+        color = RETAILER_COLORS.get(ret,"#333")
+        st.markdown(
+            f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub_uc)} SKUs</span>",
+            unsafe_allow_html=True
+        )
+        for _, row in sub_uc.iterrows():
+            key_id    = row["key_id"]
+            current   = glossario.get(key_id, "— seleccionar —")
+            nome_str  = str(row["Nome"])  if pd.notna(row.get("Nome"))       else f"(sem nome · PID {row['PID']})"
+            marca_str = str(row["Marca"]) if pd.notna(row.get("Marca"))      else "—"
+            qtd_str   = str(row["Quantidade"]) if pd.notna(row.get("Quantidade")) else "—"
+
+            col_info, col_sel, col_status = st.columns([3, 1, 0.6])
+            with col_info:
+                st.markdown(
+                    f"<strong>{nome_str}</strong><br>"
+                    f"<span style='color:#888;font-size:.8rem'>Marca: {marca_str} · Qtd: {qtd_str} · PID: {row['PID']}</span>",
+                    unsafe_allow_html=True
+                )
+            with col_sel:
+                chosen = st.selectbox(
+                    "Formato", SEL_OPTIONS,
+                    index=SEL_OPTIONS.index(current) if current in SEL_OPTIONS else 0,
+                    key=f"gls_{key_id}", label_visibility="collapsed",
+                )
+                if chosen != "— seleccionar —" and chosen != current:
+                    glossario[key_id] = chosen
+                    save_glossario(glossario)
+                    st.rerun()
+                elif chosen == "— seleccionar —" and current in FORMATO_OPTIONS:
+                    del glossario[key_id]
+                    save_glossario(glossario)
+                    st.rerun()
+            with col_status:
+                if current in FORMATO_OPTIONS:
                     st.markdown(
-                        f'<span class="tag tag-new" style="background:#dcfce7;color:#166534">✔ {current}</span>',
+                        f'<div style="padding-top:.4rem"><span class="tag" style="background:#dcfce7;color:#166534;font-size:.75rem">✔ {current}</span></div>',
                         unsafe_allow_html=True
                     )
-                st.markdown("<hr style='margin:.4rem 0;border-color:#f1f5f9;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin:.3rem 0;border-color:#f1f5f9;'>", unsafe_allow_html=True)
 
-        # ── Export table of pending classifications ──────────────────
-        classified_in_session = {k: v for k, v in st.session_state["formato_temp"].items()
-                                  if v != "— seleccionar —"}
-        if classified_in_session:
-            st.markdown("---")
-            st.markdown(f"#### ✅ {len(classified_in_session)} SKU(s) classificado(s) nesta sessão")
-            export_rows = []
-            for key_id, fmt in classified_in_session.items():
+    # ── Full glossário viewer ─────────────────────────────────────────────────
+    if glossario:
+        st.markdown("---")
+        with st.expander(f"📖 Ver glossário completo ({len(glossario)} entradas)"):
+            gl_view = []
+            for key_id, fmt in sorted(glossario.items()):
                 pid, ret = key_id.rsplit("_", 1)
-                row_m = df_sku_meta[(df_sku_meta["PID"].astype(str)==pid) &
-                                    (df_sku_meta["Retalhista"]==ret)]
-                if not row_m.empty:
-                    r = row_m.iloc[0]
-                    export_rows.append({
-                        "PID": r["PID"], "Retalhista": ret,
-                        "Nome": r["Nome"], "Marca": r["Marca"],
-                        "Quantidade": r["Quantidade"], "Formato Sugerido": fmt,
-                    })
-            if export_rows:
-                df_export = pd.DataFrame(export_rows)
-                st.dataframe(df_export, use_container_width=True, hide_index=True)
-                csv = df_export.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    "⬇️ Exportar classificações para CSV",
-                    csv,
-                    file_name="skus_classificados.csv",
-                    mime="text/csv",
-                    key="download_cls",
-                )
-                st.info("💡 Copia os valores da coluna 'Formato Sugerido' para o teu ficheiro Excel e volta a fazer upload.")
+                row_m = df_sku_list[(df_sku_list["PID"]==pid) & (df_sku_list["Retalhista"]==ret)]
+                r = row_m.iloc[0] if not row_m.empty else None
+                gl_view.append({
+                    "PID": pid, "Retalhista": ret,
+                    "Nome":   r["Nome"]   if r is not None and pd.notna(r.get("Nome"))   else "—",
+                    "Marca":  r["Marca"]  if r is not None and pd.notna(r.get("Marca"))  else "—",
+                    "Formato": fmt,
+                })
+            st.dataframe(pd.DataFrame(gl_view), use_container_width=True, hide_index=True)
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
