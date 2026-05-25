@@ -241,11 +241,10 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ════════════════════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "🆕 Produtos Novos",
     "📈 Alerta de Mudança de Preço",
-    "🏷️ Descontos Promocionais",
-    "🔍 Produto Individual",
+    "📋 Todos os Produtos",
 ])
 
 # ─────────────────────────────────────────────────────────────────
@@ -360,10 +359,17 @@ with tab2:
     if search:
         filtered = filtered[filtered["Nome"].str.contains(search, case=False, na=False)]
 
-    filtered = filtered.sort_values("Variacao_Pct", ascending=False)
+    RETAILER_ORDER = ["Continente", "PingoDoce", "Auchan"]
+    filtered["_ret_order"] = filtered["Retalhista"].map({r: i for i, r in enumerate(RETAILER_ORDER)}).fillna(99)
+    filtered = filtered.sort_values(["_ret_order", "Marca", "Nome"]).drop(columns=["_ret_order"])
 
-    # Display
-    for _, row in filtered.head(100).iterrows():
+    # Display grouped by retailer
+    current_ret = None
+    for _, row in filtered.head(200).iterrows():
+        if row["Retalhista"] != current_ret:
+            current_ret = row["Retalhista"]
+            color = RETAILER_COLORS.get(current_ret, "#333")
+            st.markdown(f"#### {current_ret}", unsafe_allow_html=True)
         changed_html = (
             '<span class="tag tag-alert">⚠️ Alterou</span>'
             if row["Houve_Alteracao"]
@@ -398,114 +404,82 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True, key=f"chart_tab2_{row['PID']}_{row['Retalhista']}")
 
 # ─────────────────────────────────────────────────────────────────
-# TAB 3 — DESCONTOS PROMOCIONAIS
+# TAB 3 — TODOS OS PRODUTOS
 # ─────────────────────────────────────────────────────────────────
 with tab3:
-    st.markdown('<div class="section-header">🏷️ Descontos Promocionais</div>', unsafe_allow_html=True)
-    st.markdown("Percentual de desconto = **(Máximo − Mínimo) / Máximo × 100**. Só produtos com pelo menos 2 leituras e variação de preço.")
+    st.markdown('<div class="section-header">📋 Todos os Produtos</div>', unsafe_allow_html=True)
+    st.markdown("Catálogo completo com histórico de preços e profundidade promocional.")
 
-    promo = (
-        df_period.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
-        .agg(Minimo="min", Maximo="max", Leituras="count", Distintos=lambda x: x.nunique())
+    # ── Filters ──
+    fa, fb, fc, fd = st.columns(4)
+    with fa:
+        f_ret = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="f_ret_all")
+    with fb:
+        all_brands = sorted(df["Marca"].dropna().unique())
+        f_brand = st.multiselect("Marca", all_brands, key="f_brand_all")
+    with fc:
+        all_sizes = sorted(df["Quantidade"].dropna().astype(str).unique())
+        f_size = st.multiselect("Tamanho", all_sizes, key="f_size_all")
+    with fd:
+        all_min = df["Data"].min().date()
+        all_max = df["Data"].max().date()
+        f_period = st.date_input("Período histórico", value=(all_min, all_max),
+                                  min_value=all_min, max_value=all_max, key="f_period_all")
+        if isinstance(f_period, (list, tuple)) and len(f_period) == 2:
+            fp_start, fp_end = f_period
+        else:
+            fp_start, fp_end = all_min, all_max
+
+    f_search = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Häagen-Dazs, Cornetto…", key="search_all")
+
+    # ── Filter data ──
+    df_all_f = df[(df["Data"].dt.date >= fp_start) & (df["Data"].dt.date <= fp_end)].copy()
+    if f_ret:
+        df_all_f = df_all_f[df_all_f["Retalhista"].isin(f_ret)]
+    if f_brand:
+        df_all_f = df_all_f[df_all_f["Marca"].isin(f_brand)]
+    if f_size:
+        df_all_f = df_all_f[df_all_f["Quantidade"].astype(str).isin(f_size)]
+    if f_search:
+        df_all_f = df_all_f[df_all_f["Nome"].str.contains(f_search, case=False, na=False)]
+
+    # ── Aggregate ──
+    all_summary = (
+        df_all_f.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
+        .agg(
+            Preco_Atual="last",
+            Preco_Min="min",
+            Preco_Max="max",
+            Leituras="count",
+        )
         .reset_index()
     )
-    promo = promo[promo["Distintos"] > 1].copy()
-    promo["Desconto_Pct"] = ((promo["Maximo"] - promo["Minimo"]) / promo["Maximo"] * 100).round(1)
-    promo = promo.sort_values("Desconto_Pct", ascending=False)
+    # Profundidade promocional: (1 - Min/Max) * 100
+    all_summary["Prof_Promo_Pct"] = ((1 - all_summary["Preco_Min"] / all_summary["Preco_Max"]) * 100).round(1)
+    all_summary.loc[all_summary["Preco_Max"] == all_summary["Preco_Min"], "Prof_Promo_Pct"] = 0.0
 
-    if promo.empty:
-        st.info("Sem variação de preço no período seleccionado.")
-    else:
-        col_thresh, col_ret = st.columns(2)
-        with col_thresh:
-            min_disc = st.slider("Desconto mínimo (%)", 0, 50, 5)
-        with col_ret:
-            ret_filter = st.multiselect("Retalhista", retailers_sel, default=retailers_sel)
+    # Sort: retailer order then brand then name
+    RET_ORD = ["Continente", "PingoDoce", "Auchan"]
+    all_summary["_ro"] = all_summary["Retalhista"].map({r: i for i, r in enumerate(RET_ORD)}).fillna(99)
+    all_summary = all_summary.sort_values(["_ro", "Marca", "Nome"]).drop(columns=["_ro"])
 
-        promo_f = promo[(promo["Desconto_Pct"] >= min_disc) & (promo["Retalhista"].isin(ret_filter))]
+    st.markdown(f"**{len(all_summary)} produto(s)** encontrado(s)")
 
-        st.markdown(f"**{len(promo_f)} produto(s)** com desconto ≥ {min_disc}%")
+    # Display by retailer
+    for ret in RET_ORD:
+        sub = all_summary[all_summary["Retalhista"] == ret]
+        if sub.empty:
+            continue
+        color = RETAILER_COLORS.get(ret, "#333")
+        st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} SKUs</span>", unsafe_allow_html=True)
 
-        # Bar chart top 20
-        top20 = promo_f.head(20)
-        if not top20.empty:
-            fig = px.bar(
-                top20,
-                x="Desconto_Pct",
-                y=top20["Nome"].str[:40],
-                color="Retalhista",
-                color_discrete_map=RETAILER_COLORS,
-                orientation="h",
-                template="plotly_white",
-                labels={"Desconto_Pct": "Desconto (%)", "y": ""},
-                title="Top 20 maiores descontos observados",
-            )
-            fig.update_layout(height=500, margin=dict(t=40,b=10), legend_title_text="")
-            st.plotly_chart(fig, use_container_width=True, key="chart_3")
-
-        # Table
-        display_promo = promo_f[["Nome","Marca","Retalhista","Minimo","Maximo","Desconto_Pct","Distintos","Leituras"]].copy()
-        display_promo.columns = ["Nome","Marca","Retalhista","Mínimo €","Máximo €","Desconto %","Preços distintos","Leituras"]
-        display_promo["Mínimo €"] = display_promo["Mínimo €"].map("{:.2f}".format)
-        display_promo["Máximo €"] = display_promo["Máximo €"].map("{:.2f}".format)
-        display_promo["Desconto %"] = display_promo["Desconto %"].map("{:.1f}".format)
-        st.dataframe(display_promo, use_container_width=True, hide_index=True)
-
-# ─────────────────────────────────────────────────────────────────
-# TAB 4 — PRODUTO INDIVIDUAL
-# ─────────────────────────────────────────────────────────────────
-with tab4:
-    st.markdown('<div class="section-header">🔍 Análise Individual de Produto</div>', unsafe_allow_html=True)
-    st.markdown("Pesquisa um produto e compara-o nos 3 retalhistas.")
-
-    search_prod = st.text_input("🔎 Nome do produto (ex: Häagen-Dazs, Ben & Jerry's, Cornetto…)")
-
-    if search_prod:
-        results = df[df["Nome"].str.contains(search_prod, case=False, na=False)]
-        if results.empty:
-            st.warning("Nenhum produto encontrado.")
-        else:
-            # Group by retailer
-            groups = results.groupby(["Retalhista","PID","Nome","Marca","Quantidade"])
-
-            # Show matches
-            matches = results[["Retalhista","PID","Nome","Marca","Quantidade"]].drop_duplicates()
-            st.markdown(f"**{len(matches)} SKU(s) encontrado(s):**")
-            for _, m in matches.iterrows():
-                st.markdown(f"- {badge(m['Retalhista'])} &nbsp; **{m['Nome']}** · {m['Marca']} · {m['Quantidade']}", unsafe_allow_html=True)
-
-            st.markdown("#### Evolução de preço")
-            fig = go.Figure()
-            for (ret, pid, nome, marca, qtd), grp in groups:
-                grp = grp.sort_values("Data")
-                fig.add_trace(go.Scatter(
-                    x=grp["Data"],
-                    y=grp["Preco"],
-                    mode="lines+markers",
-                    name=f"{ret}: {nome[:35]}",
-                    line=dict(color=RETAILER_COLORS.get(ret, "#333"), width=2),
-                    marker=dict(size=6),
-                ))
-            fig.update_layout(
-                height=380,
-                template="plotly_white",
-                yaxis_title="€",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02),
-                margin=dict(t=10,b=10),
-            )
-            st.plotly_chart(fig, use_container_width=True, key=f"chart_tab4_{id(fig)}")
-
-            # Summary table
-            summ = (
-                results.groupby(["Retalhista","Nome","Marca"])["Preco"]
-                .agg(Min="min", Max="max", Atual="last", N="count", Distintos="nunique")
-                .reset_index()
-            )
-            summ["Desconto %"] = ((summ["Max"] - summ["Min"]) / summ["Max"] * 100).round(1)
-            summ = summ.rename(columns={"Min":"Mín €","Max":"Máx €","Atual":"Preço atual €","N":"Leituras","Distintos":"Preços únicos"})
-            st.dataframe(summ, use_container_width=True, hide_index=True)
-    else:
-        st.info("Escreve um nome de produto para começar a pesquisa.")
+        display_all = sub[["PID","Nome","Marca","Quantidade","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo_Pct","Leituras"]].copy()
+        display_all.columns = ["ID","Nome","Marca","Tamanho","Preço Atual (€)","Preço Mín (€)","Preço Máx (€)","Prof. Promo (%)","Leituras"]
+        display_all["Preço Atual (€)"] = display_all["Preço Atual (€)"].map("{:.2f}".format)
+        display_all["Preço Mín (€)"]   = display_all["Preço Mín (€)"].map("{:.2f}".format)
+        display_all["Preço Máx (€)"]   = display_all["Preço Máx (€)"].map("{:.2f}".format)
+        display_all["Prof. Promo (%)"] = display_all["Prof. Promo (%)"].map("{:.1f}%".format)
+        st.dataframe(display_all, use_container_width=True, hide_index=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
