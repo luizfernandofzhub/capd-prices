@@ -671,6 +671,9 @@ with tab2:
             _fv = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
             fmt_val = str(_fv) if (_fv is not None and str(_fv) not in ("nan","<NA>","None","")) else "—"
             # FIX 4: new column order
+            # Track arrow direction for cell styling
+            nb_up  = any(a["preco_novo"] > a["preco_anterior"] for a in new_highs) if new_highs else None
+            nl_up  = any(a["preco_novo"] > a["preco_anterior"] for a in new_lows)  if new_lows  else None
             rows_display.append({
                 "⚑":     alert_icon,
                 "Formato": fmt_val,
@@ -684,17 +687,48 @@ with tab2:
                 "Novo Low €":      new_l_str,
                 "Nova Prof.%":     new_prof_str,
                 "ID":      row["PID"],
+                "_nb_up":  nb_up,   # True=up, False=down, None=no alert
+                "_nl_up":  nl_up,
             })
 
         df_display = pd.DataFrame(rows_display)
+
+        # ── Apply conditional cell styling via Styler ─────────────────────────
+        COLS_SHOW = ["⚑","Formato","Marca","Nome","Qtd",
+                     "Baseline €","Low €","Prof.%",
+                     "Novo Baseline €","Novo Low €","Nova Prof.%","ID"]
+        df_show = df_display[COLS_SHOW].copy()
+
+        def style_alert_cells(df_s):
+            styles = pd.DataFrame("", index=df_s.index, columns=df_s.columns)
+            for i in df_show.index:
+                nb_up = df_display.loc[i, "_nb_up"]
+                nl_up = df_display.loc[i, "_nl_up"]
+                if nb_up is True:
+                    styles.loc[i, "Novo Baseline €"] = (
+                        "background-color:rgba(34,197,94,0.18);"
+                        "color:#16a34a;font-weight:700")
+                elif nb_up is False:
+                    styles.loc[i, "Novo Baseline €"] = (
+                        "background-color:rgba(239,68,68,0.18);"
+                        "color:#dc2626;font-weight:700")
+                if nl_up is True:
+                    styles.loc[i, "Novo Low €"] = (
+                        "background-color:rgba(34,197,94,0.18);"
+                        "color:#16a34a;font-weight:700")
+                elif nl_up is False:
+                    styles.loc[i, "Novo Low €"] = (
+                        "background-color:rgba(239,68,68,0.18);"
+                        "color:#dc2626;font-weight:700")
+            return styles
+
+        styled = df_show.style.apply(style_alert_cells, axis=None)
 
         # Show table + on-select graph
         left_col, right_col = st.columns([3,2])
         with left_col:
             sel = st.dataframe(
-                df_display[["⚑","Formato","Marca","Nome","Qtd",
-                             "Baseline €","Low €","Prof.%",
-                             "Novo Baseline €","Novo Low €","Nova Prof.%","ID"]],
+                styled,
                 use_container_width=True, hide_index=True,
                 on_select="rerun", selection_mode="single-row",
                 key=f"tbl_{ret}",
