@@ -681,6 +681,14 @@ with tab2:
                 use_container_width=True, hide_index=True,
                 on_select="rerun", selection_mode="single-row",
                 key=f"tbl_{ret}",
+                column_config={
+                    "⚑": st.column_config.TextColumn("⚑", width="small"),
+                    "PID": st.column_config.TextColumn("PID", width="small"),
+                    "Prof.%": st.column_config.TextColumn("Prof.%", width="small"),
+                    "Nova Prof.%": st.column_config.TextColumn("Nova Prof.%", width="small"),
+                    "Baseline": st.column_config.TextColumn("Baseline", width="small"),
+                    "Low": st.column_config.TextColumn("Low", width="small"),
+                },
             )
         with right_col:
             selected_rows = sel.selection.rows if sel.selection.rows else []
