@@ -1075,10 +1075,17 @@ with tab5:
     else:
         st.info(f"**{n_missing} SKU(s)** ainda sem classificação.")
 
-    view_mode = st.radio("Mostrar:", ["Não classificados", "Todos os SKUs", "Apenas classificados"],
-                          horizontal=True, key="tab5_view")
-    uc_ret5 = st.multiselect("Filtrar por retalhista", retailers_sel,
-                              default=retailers_sel, key="uc_ret5")
+    f5a, f5b, f5c = st.columns([1, 1, 2])
+    with f5a:
+        view_mode = st.radio("Mostrar:", ["Não classificados", "Todos os SKUs", "Apenas classificados"],
+                              horizontal=False, key="tab5_view")
+    with f5b:
+        uc_ret5 = st.multiselect("Retalhista", retailers_sel,
+                                  default=retailers_sel, key="uc_ret5")
+    with f5c:
+        uc_search5 = st.text_input("🔎 Pesquisar por nome ou PID",
+                                    placeholder="ex: Magnum, Cookie Dough, 8240610…",
+                                    key="uc_search5")
 
     if view_mode == "Não classificados":
         display_skus = df_all_skus[df_all_skus["Formato"].isna()]
@@ -1088,6 +1095,15 @@ with tab5:
         display_skus = df_all_skus.copy()
 
     display_skus = display_skus[display_skus["Retalhista"].isin(uc_ret5)]
+
+    if uc_search5:
+        mask = (
+            display_skus["Nome"].str.contains(uc_search5, case=False, na=False) |
+            display_skus["PID"].astype(str).str.contains(uc_search5, case=False, na=False) |
+            display_skus.get("Marca", pd.Series(dtype=str)).str.contains(uc_search5, case=False, na=False)
+        )
+        display_skus = display_skus[mask]
+
     st.markdown(f"**{len(display_skus)} SKU(s)** com os filtros actuais.")
     st.markdown("---")
 
