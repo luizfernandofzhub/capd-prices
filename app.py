@@ -102,6 +102,36 @@ def load_data(source):
     df_all = df_all.sort_values("Data").drop_duplicates(subset=["PID","Retalhista","Data"], keep="last")
     return df_all
 
+import base64, os
+
+def get_logo_b64(filename):
+    """Load a logo PNG from the repo root and return a base64 data URI."""
+    try:
+        with open(filename, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
+        return f"data:image/png;base64,{data}"
+    except Exception:
+        return None
+
+LOGOS = {
+    "Continente": get_logo_b64("logo_continente.png"),
+    "PingoDoce":  get_logo_b64("logo_pingodoce.png"),
+    "Auchan":     get_logo_b64("logo_auchan.png"),
+}
+
+def retailer_header(ret, count_html=""):
+    """Render a retailer section header with logo + name + optional count badge."""
+    logo = LOGOS.get(ret)
+    logo_html = f'<img src="{logo}" style="height:28px;vertical-align:middle;margin-right:8px;">' if logo else ""
+    color = RETAILER_COLORS.get(ret, "#333")
+    return (
+        f'<div style="display:flex;align-items:center;gap:.5rem;margin:1.2rem 0 .6rem;">' +
+        logo_html +
+        f'<span style="font-family:DM Serif Display,serif;font-size:1.4rem;font-weight:600;">{ret}</span>' +
+        (f'&nbsp;{count_html}' if count_html else "") +
+        "</div>"
+    )
+
 GLOSSARIO_KEY = "glossario_formato_v1"
 FORMATO_OPTIONS = ["Bars","Bites","Bites - PromoPack","Cakes","Cones","Cups",
                    "Frozen Fruits","Other","Pints","Pints - PromoPack",
@@ -300,7 +330,6 @@ with st.sidebar:
                                 min_value=min_date, max_value=max_date)
     d_start, d_end = (date_range[0], date_range[1]) if len(date_range)==2 else (min_date, max_date)
     st.markdown("---")
-    new_prod_days = st.slider("🆕 Novos produtos: últimos N dias", min_value=3, max_value=60, value=7)
 
 df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
 sku_cls   = build_classifications(df)
@@ -356,36 +385,119 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ═══════════════════════════════════════════════════════════════════
 with tab1:
     st.markdown('<div class="section-header">🆕 Produtos Novos</div>', unsafe_allow_html=True)
-    st.markdown(f"Produtos cuja **primeira leitura** ocorreu nos últimos **{new_prod_days} dias** (a contar de {max_date}).")
+
+    # ── Filter: days selector at top of tab (FIX 1) ──────────────────────────
+    t1a, t1b = st.columns([1, 3])
+    with t1a:
+        new_prod_days = st.slider("Primeiros dados nos últimos N dias",
+                                   min_value=3, max_value=90, value=7, step=1,
+                                   key="new_prod_days_slider")
+    with t1b:
+        st.markdown("")  # spacer
+
+    # ── FIX 5: exclude SKUs present on the very first date (launch SKUs) ─────
+    first_date_global = df["Data"].min()
+    launch_skus = set(
+        df[df["Data"] == first_date_global]
+        .apply(lambda r: f"{r['PID']}_{r['Retalhista']}", axis=1)
+    )
+
     cutoff = pd.Timestamp(max_date) - timedelta(days=new_prod_days)
-    first_seen = df.groupby(["PID","Retalhista"])["Data"].min().reset_index().rename(columns={"Data":"Primeira_Leitura"})
-    new_products = first_seen[first_seen["Primeira_Leitura"] >= cutoff].copy()
+    first_seen = (df.groupby(["PID","Retalhista"])["Data"].min()
+                  .reset_index().rename(columns={"Data":"Primeira_Leitura"}))
+
+    # Exclude launch-day SKUs from "new products"
+    first_seen["key"] = first_seen["PID"].astype(str) + "_" + first_seen["Retalhista"]
+    first_seen_filtered = first_seen[~first_seen["key"].isin(launch_skus)].drop(columns=["key"])
+
+    new_products = first_seen_filtered[first_seen_filtered["Primeira_Leitura"] >= cutoff].copy()
+
+    st.markdown(f"Produtos cuja **primeira leitura** ocorreu nos últimos **{new_prod_days} dias** (a contar de {max_date}).")
+
     if new_products.empty:
         st.info(f"Nenhum produto novo nos últimos {new_prod_days} dias.")
     else:
-        latest_price = df.sort_values("Data").groupby(["PID","Retalhista"]).last()[["Preco","Nome","Marca","Quantidade"]].reset_index()
+        # Get latest price + price history min/max (FIX 3)
+        price_stats = (df.groupby(["PID","Retalhista"])["Preco"]
+                       .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max")
+                       .reset_index())
+        meta_cols = df.sort_values("Data").groupby(["PID","Retalhista"]).last()[["Nome","Marca","Quantidade"]].reset_index()
+        price_stats = price_stats.merge(meta_cols, on=["PID","Retalhista"])
+
         new_products["PID"] = new_products["PID"].astype(str)
-        latest_price["PID"] = latest_price["PID"].astype(str)
-        new_products = new_products.merge(latest_price, on=["PID","Retalhista"])
+        price_stats["PID"]  = price_stats["PID"].astype(str)
+        new_products = new_products.merge(price_stats, on=["PID","Retalhista"])
         new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
         new_products = new_products.sort_values(["Primeira_Leitura","Retalhista"], ascending=[False,True])
-        # Add Formato from static lookup
         new_products = new_products.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+
         st.markdown(f"**{len(new_products)} produto(s) encontrado(s)**")
+
+        glossario = load_glossario()
+
         for ret in RETAILER_ORDER:
-            sub = new_products[new_products["Retalhista"]==ret]
+            sub = new_products[new_products["Retalhista"]==ret].copy()
             if sub.empty: continue
-            color = RETAILER_COLORS.get(ret,"#333")
-            st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} novos</span>", unsafe_allow_html=True)
-            d = sub[["PID","Nome","Marca","Quantidade","Formato","Preco","Primeira_Leitura"]].copy()
-            d.columns = ["ID","Nome","Marca","Quantidade","Formato","Preço atual (€)","1ª Leitura"]
+
+            # FIX 6: larger green badge
+            count_badge = (f'<span style="font-size:1.05rem;font-weight:700;color:#84cc16;'
+                           f'background:#1a2e05;padding:2px 12px;border-radius:20px;">' +
+                           f'{len(sub)} novos</span>')
+            # FIX 2: retailer header with logo
+            st.markdown(retailer_header(ret, count_badge), unsafe_allow_html=True)
+
+            # FIX 4: inline Formato classification for unclassified SKUs
+            # Build display with selectbox for unclassified
+            display_rows = []
+            changed = False
+            for _, row in sub.iterrows():
+                key_id  = f"{row['PID']}_{ret}"
+                fmt_val = glossario.get(key_id)
+                if fmt_val is None:
+                    fmt_val = None  # will show selectbox
+                display_rows.append((row, key_id, fmt_val))
+
+            # Check if any need classification
+            needs_cls = any(fv is None for _, _, fv in display_rows)
+
+            # Build table for rows with Formato already classified
+            d = sub[["PID","Nome","Marca","Quantidade","Formato","Preco_Atual","Preco_Min","Preco_Max","Primeira_Leitura"]].copy()
+            d["Formato"] = d.apply(
+                lambda r: glossario.get(f"{r['PID']}_{ret}", r["Formato"]), axis=1
+            )
             d["Formato"] = d["Formato"].fillna("—")
-            d["1ª Leitura"] = d["1ª Leitura"].dt.strftime("%d/%m/%Y")
-            d["Preço atual (€)"] = d["Preço atual (€)"].map("{:.2f} €".format)
+            d.columns = ["ID","Nome","Marca","Quantidade","Formato","Preço Atual €","Mín €","Máx €","1ª Leitura"]
+            d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
+            d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
+            d["Máx €"]         = d["Máx €"].map("{:.2f}".format)
+            d["1ª Leitura"]    = d["1ª Leitura"].dt.strftime("%d/%m/%Y")
             st.dataframe(d, use_container_width=True, hide_index=True)
-    if not first_seen.empty:
+
+            # FIX 4: show inline selectboxes for unclassified SKUs
+            unclassified = [(row, key_id) for row, key_id, fv in display_rows if fv is None and row["Formato"] == "—" or (fv is None and pd.isna(row.get("Formato","")))]
+            unclassified = [(row, key_id) for row, key_id, fv in display_rows
+                            if fv is None and (pd.isna(row.get("Formato")) or str(row.get("Formato","")) in ("nan","None","—",""))]
+            if unclassified:
+                st.markdown(f"**{len(unclassified)} SKU(s) sem Formato** — classifica abaixo:")
+                SEL_OPTS = ["— seleccionar —"] + FORMATO_OPTIONS
+                for row, key_id in unclassified:
+                    c_name, c_sel = st.columns([3,1])
+                    with c_name:
+                        st.markdown(f"<small style='color:#888'>{row['Nome']} · {row['Marca']}</small>",
+                                    unsafe_allow_html=True)
+                    with c_sel:
+                        chosen = st.selectbox("Formato", SEL_OPTS, key=f"t1_fmt_{key_id}",
+                                              label_visibility="collapsed")
+                        if chosen != "— seleccionar —":
+                            glossario[key_id] = chosen
+                            save_glossario(glossario)
+                            st.rerun()
+
+    # ── FIX 5: Timeline chart excluding launch SKUs ───────────────────────────
+    if not first_seen_filtered.empty:
         st.markdown("#### Histórico de entrada de novos produtos")
-        tl = first_seen.copy()
+        st.caption(f"Nota: SKUs presentes desde o início da base ({first_date_global.strftime('%d/%m/%Y')}) foram excluídos.")
+        tl = first_seen_filtered.copy()
         tl["Semana"] = tl["Primeira_Leitura"].dt.to_period("W").dt.start_time
         weekly = tl.groupby(["Semana","Retalhista"]).size().reset_index(name="Novos SKUs")
         fig = px.bar(weekly, x="Semana", y="Novos SKUs", color="Retalhista",
@@ -460,8 +572,7 @@ with tab2:
     for ret in RETAILER_ORDER:
         sub_ret = cf[cf["Retalhista"]==ret]
         if sub_ret.empty: continue
-        color = RETAILER_COLORS.get(ret,"#333")
-        st.markdown(f"### {ret}", unsafe_allow_html=True)
+        st.markdown(retailer_header(ret), unsafe_allow_html=True)
 
         # Brand summary
         brand_summary = sub_ret.groupby("Marca").agg(
@@ -619,8 +730,8 @@ with tab3:
     for ret in RETAILER_ORDER:
         sub = all_sum[all_sum["Retalhista"]==ret]
         if sub.empty: continue
-        color = RETAILER_COLORS.get(ret,"#333")
-        st.markdown(f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub)} SKUs</span>", unsafe_allow_html=True)
+        count_b3 = f'<span style="font-size:.85rem;color:#888">{len(sub)} SKUs</span>'
+        st.markdown(retailer_header(ret, count_b3), unsafe_allow_html=True)
         d = sub[["PID","Nome","Marca","Quantidade","Formato","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]].copy()
         d.columns = ["ID","Nome","Marca","Tamanho","Formato","Estratégia","Preço Atual €","Mín €","Máx €","Prof. Promo %","Alerta","Leituras"]
         d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
