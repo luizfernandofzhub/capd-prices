@@ -624,9 +624,9 @@ with tab2:
         # FIX 6: legend
         st.markdown(
             '<div style="font-size:.78rem;color:#888;margin-bottom:.4rem;">' +
-            '<span style="background:#0891b2;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NB</span>Novo Baseline &nbsp;' +
-            '<span style="background:#db2777;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NL</span>Novo Low &nbsp;' +
-            '<span style="background:#7c3aed;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NHL</span>Novo Baseline + Novo Low' +
+            '🟠 Novo Baseline &nbsp;&nbsp;' +
+            '🟣 Novo Low &nbsp;&nbsp;' +
+            '🟠🟣 Novo Baseline + Novo Low' +
             '</div>', unsafe_allow_html=True
         )
         # ── Main table + detail ──
@@ -635,9 +635,9 @@ with tab2:
         rows_display = []
         for _, row in sub_sorted.iterrows():
             al = row["Alert_Label"]
-            if al == "NB+NL": alert_icon = '<span style="background:#7c3aed;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NHL</span>'
-            elif al == "NB":   alert_icon = '<span style="background:#0891b2;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NB</span>'
-            elif al == "NL":   alert_icon = '<span style="background:#db2777;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NL</span>'
+            if al == "NB+NL": alert_icon = "🟠🟣"
+            elif al == "NB":   alert_icon = "🟠"
+            elif al == "NL":   alert_icon = "🟣"
             else:              alert_icon = ""
             alert_pill = alert_icon  # keep compat
 
