@@ -813,10 +813,16 @@ with tab4:
     if g_brand:  dg = dg[dg["Marca"].isin(g_brand)]
     if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
     if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
-    # Merge Formato for tab4 filter
+    # Merge Formato for tab4 filter — use live glossario from session state
     dg["PID"] = dg["PID"].astype(str)
-    dg = dg.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    if g_fmt and "Formato" in dg.columns: dg = dg[dg["Formato"].isin(g_fmt)]
+    live_glossario = load_glossario()
+    live_fmt = build_formato_lookup(live_glossario, df_sku_list)
+    if not live_fmt.empty:
+        dg = dg.merge(live_fmt, on=["PID","Retalhista"], how="left")
+    else:
+        dg["Formato"] = None
+    if g_fmt and "Formato" in dg.columns:
+        dg = dg[dg["Formato"].isin(g_fmt)]
 
     # Apply strategy filter via sku_cls
     if g_tipo:
@@ -834,31 +840,64 @@ with tab4:
         st.warning(f"Muitos SKUs ({n_skus_g}) para visualizar. Aplica mais filtros (sugestão: máx {MAX_LINES} linhas para boa leitura).")
     else:
         fig4 = go.Figure()
-        palette = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
+        # Rich palette: 48 distinct colors
+        PALETTE = (
+            px.colors.qualitative.Plotly +
+            px.colors.qualitative.D3 +
+            px.colors.qualitative.Set1 +
+            px.colors.qualitative.Dark24
+        )
+        # Deduplicate palette
+        seen = set(); PALETTE = [c for c in PALETTE if not (c in seen or seen.add(c))]
+
+        # Dash style distinguishes retailers; color distinguishes SKUs
+        DASHES = {"Continente":"solid","PingoDoce":"dash","Auchan":"dot"}
         sku_groups = list(dg.groupby(["PID","Retalhista","Nome","Marca"]))
+
         for i, ((pid,ret,nome,marca), grp) in enumerate(sku_groups):
-            grp = grp.sort_values("Data")
-            color = RETAILER_COLORS.get(ret, palette[i % len(palette)])
-            dash = "solid" if ret=="Continente" else ("dash" if ret=="PingoDoce" else "dot")
-            label = f"{nome[:30]} [{ret[:3]}]"
+            grp  = grp.sort_values("Data")
+            color = PALETTE[i % len(PALETTE)]
+            dash  = DASHES.get(ret, "solid")
+            label = f"{nome[:35]}"
             fig4.add_trace(go.Scatter(
                 x=grp["Data"], y=grp["Preco"],
                 mode="lines+markers", name=label,
-                line=dict(color=color, width=1.8, dash=dash),
-                marker=dict(size=4),
-                hovertemplate=f"<b>{nome}</b><br>{ret}<br>%{{x|%d/%m/%Y}}<br>%{{y:.2f}}€<extra></extra>",
+                line=dict(color=color, width=2, dash=dash),
+                marker=dict(size=5, color=color),
+                hovertemplate=(
+                    f"<b>{nome}</b><br>"
+                    f"{ret}<br>"
+                    "%{x|%d/%m/%Y}<br>"
+                    "<b>%{y:.2f} €</b>"
+                    "<extra></extra>"
+                ),
             ))
+
         fig4.update_layout(
-            height=550,
+            height=580,
             template="plotly_white",
             yaxis_title="Preço (€)",
             xaxis_title="",
             hovermode="x unified",
             legend=dict(
-                orientation="v", yanchor="top", y=1, xanchor="left", x=1.01,
-                font=dict(size=10),
+                orientation="v", yanchor="top", y=1,
+                xanchor="left", x=1.01,
+                font=dict(size=11),
+                bgcolor="rgba(255,255,255,0.85)",
+                bordercolor="#e5e7eb", borderwidth=1,
             ),
-            margin=dict(t=20, b=20, l=10, r=10),
+            plot_bgcolor="#f8fafc",
+            paper_bgcolor="white",
+            xaxis=dict(showgrid=True, gridcolor="#e5e7eb"),
+            yaxis=dict(showgrid=True, gridcolor="#e5e7eb"),
+            margin=dict(t=20, b=20, l=10, r=180),
+        )
+        # Add retailer dash legend annotation
+        fig4.add_annotation(
+            text="— Continente &nbsp; ╌ PingoDoce &nbsp; ··· Auchan",
+            xref="paper", yref="paper", x=0, y=-0.06,
+            showarrow=False, font=dict(size=10, color="#888"),
+            align="left",
         )
         st.plotly_chart(fig4, use_container_width=True, key="chart_tab4_multi")
 
