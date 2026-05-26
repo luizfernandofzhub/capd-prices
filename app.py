@@ -677,7 +677,7 @@ with tab2:
         left_col, right_col = st.columns([3,2])
         with left_col:
             sel = st.dataframe(
-                df_display[["PID","Nome","Marca","Quantidade","Formato","Estratégia","High","Low","Prof.%","Novo High","Novo Low","Nova Prof.%","Alerta"]],
+                df_display[["⚑","PID","Nome","Marca","Quantidade","Formato","Estratégia","Baseline","Low","Prof.%","Novo Baseline","Novo Low","Nova Prof.%"]],
                 use_container_width=True, hide_index=True,
                 on_select="rerun", selection_mode="single-row",
                 key=f"tbl_{ret}",
