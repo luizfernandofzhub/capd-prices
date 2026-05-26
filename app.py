@@ -27,13 +27,13 @@ h1, h2, h3 { font-family: 'DM Serif Display', serif; }
     display:flex; gap:1rem; margin-bottom:1rem;
 }
 .kpi-item {
-    background:white; border-radius:8px;
-    padding:.45rem 1rem; flex:1;
+    background:#e8e8e8; border-radius:8px;
+    padding:.55rem 1.1rem; flex:1;
     border-left:3px solid #1a1a1a;
     box-shadow:0 1px 3px rgba(0,0,0,.06);
 }
-.kpi-item h4 { margin:0; font-size:.65rem; color:#999; letter-spacing:.07em; text-transform:uppercase; }
-.kpi-item p  { margin:.1rem 0 0; font-size:1.3rem; font-weight:700; color:#1a1a1a; }
+.kpi-item h4 { margin:0; font-size:.72rem; color:#444; letter-spacing:.07em; text-transform:uppercase; font-weight:600; }
+.kpi-item p  { margin:.15rem 0 0; font-size:1.45rem; font-weight:700; color:#1a1a1a; }
 
 /* ── Alert tags ── */
 .tag { display:inline-block; padding:1px 8px; border-radius:20px; font-size:.68rem; font-weight:700; margin:1px; white-space:nowrap; }
@@ -385,7 +385,16 @@ st.markdown("""
     Monitorização de preços · Continente · Auchan · Pingo Doce
 </p>""", unsafe_allow_html=True)
 
-# ── Slim KPI bar ───────────────────────────────────────────────────────────────
+# ── Tabs first ─────────────────────────────────────────────────────────────────
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🆕 Produtos Novos",
+    "📣 Alerta de Mudança de Preço",
+    "📋 Todos os Produtos",
+    "📊 Evolução de Preços",
+    "🏷️ SKUs não classificados",
+])
+
+# ── Slim KPI bar (below tabs) ───────────────────────────────────────────────────
 n_skus   = df_period[["PID","Retalhista"]].drop_duplicates().shape[0]
 n_brands = df_period["Marca"].nunique()
 n_obs    = len(df_period)
@@ -401,15 +410,6 @@ st.markdown(f"""
   <div class="kpi-item" style="border-color:#dc2626"><h4>SKUs com alerta</h4><p style="color:#dc2626">{n_alerts}</p></div>
 </div>
 """, unsafe_allow_html=True)
-
-# ── Tabs ───────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🆕 Produtos Novos",
-    "📣 Alerta de Mudança de Preço",
-    "📋 Todos os Produtos",
-    "📊 Evolução de Preços",
-    "🏷️ SKUs não classificados",
-])
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 1 — NOVOS PRODUTOS
@@ -543,30 +543,31 @@ with tab2:
     st.markdown('<div class="section-header">📣 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
 
     # ── Filters ──
-    # ── Row 1: period + search ────────────────────────────────────────────────
-    r1a, r1b, r1c = st.columns([1.2, 1, 2])
+    # ── Row 1: main filters ───────────────────────────────────────────────────
+    r1a, r1b, r1c, r1d = st.columns([1, 1, 1, 1])
     with r1a:
         period2 = st.date_input("Período", value=(min_date, max_date),
                                  min_value=min_date, max_value=max_date, key="period2")
         p2_start, p2_end = (period2[0], period2[1]) if len(period2)==2 else (min_date, max_date)
     with r1b:
+        ret2   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
+    with r1c:
+        brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
+    with r1d:
+        search2 = st.text_input("🔎 Nome", placeholder="ex: Ben & Jerry's", key="search2")
+
+    # ── Row 2: secondary filters ──────────────────────────────────────────────
+    r2a, r2b, r2c, r2d = st.columns([1, 1, 1, 1])
+    with r2a:
         only_alerts2 = st.checkbox("🚨 Apenas SKUs com alertas", value=True, key="chk_alerts2")
         alert_type2  = st.multiselect("Tipo de alerta", ["NB","NL","NB+NL"], key="alert_type2")
-    with r1c:
-        search2 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's", key="search2")
-
-    # ── Row 2: dimension filters ───────────────────────────────────────────────
-    r2a, r2b, r2c, r2d = st.columns(4)
-    with r2a:
-        ret2   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
     with r2b:
-        brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
-    with r2c:
         tipo2  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
-    with r2d:
+    with r2c:
         fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
         fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
-    st.caption("ℹ️ O período afecta apenas o gráfico. As classificações e alertas usam sempre o histórico completo.")
+    with r2d:
+        st.caption("ℹ️ Período afecta apenas o gráfico.")
 
     # ── Filter ──
     cf = sku_cls[sku_cls["Retalhista"].isin(ret2 or retailers_sel)].copy()
@@ -623,10 +624,12 @@ with tab2:
 
         # FIX 6: legend
         st.markdown(
-            '<div style="font-size:.78rem;color:#888;margin-bottom:.4rem;">' +
-            '🟠 Novo Baseline &nbsp;&nbsp;' +
-            '🟣 Novo Low &nbsp;&nbsp;' +
-            '🟠🟣 Novo Baseline + Novo Low' +
+            '<div style="font-size:.78rem;margin-bottom:.5rem;">' +
+            '<span style="color:#888">Alertas: </span>' +
+            '🟠 <span style="color:#ea580c;font-weight:600">Novo Baseline</span> &nbsp;&nbsp;' +
+            '🟣 <span style="color:#7c3aed;font-weight:600">Novo Low</span> &nbsp;&nbsp;' +
+            '🟠🟣 <span style="color:#888;font-weight:600">Novo Baseline + Novo Low</span> &nbsp;&nbsp;' +
+            '<span style="color:#888;margin-left:1rem">↑ superior ao anterior &nbsp; ↓ inferior ao anterior</span>' +
             '</div>', unsafe_allow_html=True
         )
         # ── Main table + detail ──
@@ -642,33 +645,45 @@ with tab2:
             alert_pill = alert_icon  # keep compat
 
             if row["Tipo_Preco"] == "Preço Único":
-                tipo_str  = '<span class="tag tag-pu">💰 Preço Único</span>'
                 high_str  = f'{row["Preco_High"]:.2f} €' if row["Preco_High"] else "—"
                 low_str   = "—"; prof_str = "—"
                 new_h_str = "—"; new_l_str = "—"; new_prof_str = "—"
             else:
-                tipo_str  = '<span class="tag tag-hl">🔁 High-Low</span>'
-                high_str  = f'🔴 {row["Preco_High"]:.2f} €' if row["Preco_High"] else "—"
-                low_str   = f'🟢 {row["Preco_Low"]:.2f} €'  if row["Preco_Low"]  else "—"
-                prof_str  = f'{row["Prof_Promo"]:.1f}%'      if row["Prof_Promo"] else "—"
+                # FIX 6: no emoji icons, orange for baseline, purple for low
+                high_str  = f'{row["Preco_High"]:.2f} €' if row["Preco_High"] else "—"
+                low_str   = f'{row["Preco_Low"]:.2f} €'  if row["Preco_Low"]  else "—"
+                prof_str  = f'{row["Prof_Promo"]:.1f}%'  if row["Prof_Promo"] else "—"
                 als = row["Alertas"] or []
                 new_highs = [a for a in als if "Baseline" in a["tipo"]]
-                new_lows  = [a for a in als if "Low"  in a["tipo"]]
-                new_h_str  = " | ".join(f'📈 {a["preco_anterior"]:.2f}→{a["preco_novo"]:.2f}€' for a in new_highs) or "—"
-                new_l_str  = " | ".join(f'📉 {a["preco_anterior"]:.2f}→{a["preco_novo"]:.2f}€' for a in new_lows)  or "—"
-                # New prof = from most recent alert
+                new_lows  = [a for a in als if "Low" in a["tipo"]]
+                # FIX 7: only new price; FIX 6: direction arrows
+                def fmt_new_bl(a):
+                    arrow = "↑" if a["preco_novo"] > a["preco_anterior"] else "↓"
+                    return f'{arrow} {a["preco_novo"]:.2f} €'
+                def fmt_new_low(a):
+                    arrow = "↑" if a["preco_novo"] > a["preco_anterior"] else "↓"
+                    return f'{arrow} {a["preco_novo"]:.2f} €'
+                new_h_str  = " | ".join(fmt_new_bl(a)  for a in new_highs) or "—"
+                new_l_str  = " | ".join(fmt_new_low(a) for a in new_lows)  or "—"
                 all_als = new_highs + new_lows
                 new_prof_str = f'{all_als[-1]["prof_nova"]:.1f}%' if all_als else "—"
 
             _fv = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
             fmt_val = str(_fv) if (_fv is not None and str(_fv) not in ("nan","<NA>","None","")) else "—"
+            # FIX 4: new column order
             rows_display.append({
-                "⚑":alert_icon,
-                "PID":row["PID"], "Nome":row["Nome"], "Marca":row["Marca"],
-                "Quantidade":row["Quantidade"], "Formato": fmt_val if pd.notna(fmt_val) else "—",
-                "Estratégia":row["Tipo_Preco"],
-                "Baseline":high_str, "Low":low_str, "Prof.%":prof_str,
-                "Novo Baseline":new_h_str, "Novo Low":new_l_str, "Nova Prof.%":new_prof_str,
+                "⚑":     alert_icon,
+                "Formato": fmt_val,
+                "Marca":   row["Marca"],
+                "Nome":    row["Nome"],
+                "Qtd":     row["Quantidade"],
+                "Baseline €": high_str,
+                "Low €":      low_str,
+                "Prof.%":     prof_str,
+                "Novo Baseline €": new_h_str,
+                "Novo Low €":      new_l_str,
+                "Nova Prof.%":     new_prof_str,
+                "ID":      row["PID"],
             })
 
         df_display = pd.DataFrame(rows_display)
@@ -677,17 +692,22 @@ with tab2:
         left_col, right_col = st.columns([3,2])
         with left_col:
             sel = st.dataframe(
-                df_display[["⚑","PID","Nome","Marca","Quantidade","Formato","Estratégia","Baseline","Low","Prof.%","Novo Baseline","Novo Low","Nova Prof.%"]],
+                df_display[["⚑","Formato","Marca","Nome","Qtd",
+                             "Baseline €","Low €","Prof.%",
+                             "Novo Baseline €","Novo Low €","Nova Prof.%","ID"]],
                 use_container_width=True, hide_index=True,
                 on_select="rerun", selection_mode="single-row",
                 key=f"tbl_{ret}",
                 column_config={
-                    "⚑": st.column_config.TextColumn("⚑", width="small"),
-                    "PID": st.column_config.TextColumn("PID", width="small"),
-                    "Prof.%": st.column_config.TextColumn("Prof.%", width="small"),
-                    "Nova Prof.%": st.column_config.TextColumn("Nova Prof.%", width="small"),
-                    "Baseline": st.column_config.TextColumn("Baseline", width="small"),
-                    "Low": st.column_config.TextColumn("Low", width="small"),
+                    "⚑":             st.column_config.TextColumn("⚑",             width="small"),
+                    "Qtd":            st.column_config.TextColumn("Qtd",            width="small"),
+                    "Prof.%":         st.column_config.TextColumn("Prof.%",         width="small"),
+                    "Nova Prof.%":    st.column_config.TextColumn("Nova Prof.%",    width="small"),
+                    "Baseline €":     st.column_config.TextColumn("Baseline €",     width="small"),
+                    "Low €":          st.column_config.TextColumn("Low €",          width="small"),
+                    "Novo Baseline €":st.column_config.TextColumn("Novo Baseline €",width="small"),
+                    "Novo Low €":     st.column_config.TextColumn("Novo Low €",     width="small"),
+                    "ID":             st.column_config.TextColumn("ID",             width="small"),
                 },
             )
         with right_col:
@@ -702,7 +722,7 @@ with tab2:
                     fig2.add_hrect(y0=row["Preco_Low"]*0.99, y1=row["Preco_High"]*1.01,
                                    fillcolor="rgba(234,179,8,0.06)", line_width=0)
                     fig2.add_hline(y=row["Preco_High"], line_dash="dot", line_color="rgba(220,38,38,0.6)",
-                                   annotation_text=f"High {row['Preco_High']:.2f}€", annotation_position="top right")
+                                   annotation_text=f"Baseline {row['Preco_High']:.2f}€", annotation_position="top right")
                     fig2.add_hline(y=row["Preco_Low"], line_dash="dot", line_color="rgba(22,163,74,0.6)",
                                    annotation_text=f"Low {row['Preco_Low']:.2f}€", annotation_position="bottom right")
                 fig2.add_trace(go.Scatter(
