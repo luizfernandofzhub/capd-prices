@@ -152,6 +152,8 @@ def load_glossario_csv_from_github():
         return result
     except Exception:
         return {}
+    except Exception:
+        return {}
 
 def load_glossario():
     """Load glossário from session_state. On first load, seeds from GitHub CSV."""
@@ -190,6 +192,18 @@ def import_glossario_csv(uploaded_csv):
         return imported
     except Exception as e:
         return f"Erro: {e}"
+
+@st.cache_data(ttl=3600)
+def load_glossario_df():
+    """Load the full glossario CSV including Marca Padronizada."""
+    try:
+        df_gl = pd.read_csv("glossario_formato.csv")
+        df_gl["PID"] = df_gl["PID"].astype(str)
+        if "Marca Padronizada" not in df_gl.columns:
+            df_gl["Marca Padronizada"] = df_gl.get("Marca", None)
+        return df_gl
+    except Exception:
+        return pd.DataFrame(columns=["PID","Retalhista","Nome","Marca","Marca Padronizada","Quantidade","Formato"])
 
 @st.cache_data(ttl=300)
 def load_sku_list_from_excel(source):
@@ -370,6 +384,19 @@ sku_cls["PID"] = sku_cls["PID"].astype(str)  # normalise PID type throughout
 df_sku_list   = load_sku_list_from_excel(data_source)
 _glossario    = load_glossario()
 df_fmt_lookup = build_formato_lookup(_glossario, df_sku_list)
+# Load Marca Padronizada from glossario CSV
+df_gl_full    = load_glossario_df()
+# Merge Marca Padronizada into df and df_sku_list
+if not df_gl_full.empty and "Marca Padronizada" in df_gl_full.columns:
+    mp_map = df_gl_full[["PID","Retalhista","Marca Padronizada"]].drop_duplicates()
+    df["PID"] = df["PID"].astype(str)
+    if "Marca Padronizada" in df.columns:
+        df = df.drop(columns=["Marca Padronizada"])
+    df = df.merge(mp_map, on=["PID","Retalhista"], how="left")
+    df_sku_list["PID"] = df_sku_list["PID"].astype(str)
+    if "Marca Padronizada" in df_sku_list.columns:
+        df_sku_list = df_sku_list.drop(columns=["Marca Padronizada"])
+    df_sku_list = df_sku_list.merge(mp_map, on=["PID","Retalhista"], how="left")
 
 # ── SKU static metadata (one row per PID×Retalhista, with Formato) ──────
 df_sku_meta = (df.sort_values("Data")
@@ -551,7 +578,8 @@ with tab2:
     with r1b:
         ret2   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
     with r1c:
-        brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
+        mp_opts2 = sorted(df["Marca Padronizada"].dropna().unique()) if "Marca Padronizada" in df.columns else sorted(df["Marca"].dropna().unique())
+        brand2 = st.multiselect("Marca", mp_opts2, key="brand2")
     with r1d:
         search2 = st.text_input("🔎 Nome", placeholder="ex: Ben & Jerry's", key="search2")
 
@@ -570,7 +598,13 @@ with tab2:
 
     # ── Filter ──
     cf = sku_cls[sku_cls["Retalhista"].isin(ret2 or retailers_sel)].copy()
-    if brand2:  cf = cf[cf["Marca"].isin(brand2)]
+    if brand2:
+        if "Marca Padronizada" in cf.columns:
+            cf = cf.merge(df[["PID","Retalhista","Marca Padronizada"]].drop_duplicates(), on=["PID","Retalhista"], how="left", suffixes=("","_mp"))
+            mp_col = "Marca Padronizada_mp" if "Marca Padronizada_mp" in cf.columns else "Marca Padronizada"
+            cf = cf[cf[mp_col].isin(brand2)]
+        else:
+            cf = cf[cf["Marca"].isin(brand2)]
     if tipo2:   cf = cf[cf["Tipo_Preco"].isin(tipo2)]
     if search2: cf = cf[cf["Nome"].str.contains(search2, case=False, na=False)]
     if only_alerts2: cf = cf[cf["Alert_Label"].notna()]
@@ -793,7 +827,8 @@ with tab4:
     with g1:
         g_ret   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="g_ret")
     with g2:
-        g_brand = st.multiselect("Marca", sorted(df["Marca"].dropna().unique()), key="g_brand")
+        mp_opts4 = sorted(df["Marca Padronizada"].dropna().unique()) if "Marca Padronizada" in df.columns else sorted(df["Marca"].dropna().unique())
+        g_brand = st.multiselect("Marca", mp_opts4, key="g_brand")
     with g3:
         g_size  = st.multiselect("Tamanho", sorted(df["Quantidade"].dropna().astype(str).unique()), key="g_size")
     with g4:
@@ -810,7 +845,7 @@ with tab4:
     # Filter data
     dg = df[(df["Data"].dt.date>=gp_s)&(df["Data"].dt.date<=gp_e)].copy()
     if g_ret:    dg = dg[dg["Retalhista"].isin(g_ret)]
-    if g_brand:  dg = dg[dg["Marca"].isin(g_brand)]
+    if g_brand:  dg = dg[dg["Marca Padronizada"].isin(g_brand)] if "Marca Padronizada" in dg.columns else dg[dg["Marca"].isin(g_brand)]
     if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
     if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
     # Merge Formato for tab4 filter
