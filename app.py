@@ -223,53 +223,84 @@ def build_formato_lookup(glossario_dict, sku_list_df):
 
 
 # ── Classification logic ───────────────────────────────────────────────────────
-def classify_sku(price_series, outlier_min_count=3, outlier_min_pct=5.0):
-    prices = [float(p) for p in price_series if pd.notna(p)]
-    n = len(prices)
-    if n == 0:
+def classify_sku(price_series_with_dates, outlier_min_count=3, outlier_min_pct=5.0):
+    """Accepts list of (date, price) tuples sorted chronologically."""
+    if not price_series_with_dates:
         return {"tipo":"Sem dados","preco_high":None,"preco_low":None,"prof_promo":0.0,"alerta":None}
+
+    dated = [(d, float(p)) for d, p in price_series_with_dates if pd.notna(p)]
+    if not dated:
+        return {"tipo":"Sem dados","preco_high":None,"preco_low":None,"prof_promo":0.0,"alerta":None}
+
+    prices = [p for _, p in dated]
+    n = len(prices)
     cnt = _Counter(prices)
-    unique_prices = sorted(set(prices))
+    unique_prices = sorted(cnt.keys())
+
     most_common_count = cnt.most_common(1)[0][1]
     if most_common_count/n >= 0.90 or len(unique_prices) == 1:
         return {"tipo":"Preço Único","preco_high":max(prices),"preco_low":None,"prof_promo":0.0,"alerta":None}
 
-    # ── H-L core: the TWO most frequent prices define the established High and Low.
-    # This is more robust than median-split because it correctly identifies the
-    # dominant price pair regardless of how many "new" prices exist.
+    # Top-2 most frequent = established Baseline / Low pair
     top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
-    est_high = max(top2)   # higher of the two dominant prices = regular/full price
-    est_low  = min(top2)   # lower  of the two dominant prices = promo price
+    est_baseline = max(top2)
+    est_low      = min(top2)
+    known = {est_baseline, est_low}
+    prof = (1 - est_low/est_baseline)*100 if est_baseline > 0 else 0.0
 
-    known = {est_high, est_low}
-    prof = (1 - est_low/est_high)*100 if est_high > 0 else 0.0
+    # First-seen date for each price (chronological direction)
+    first_seen_date = {}
+    for date, price in dated:
+        if price not in first_seen_date:
+            first_seen_date[price] = date
+    bl_first  = first_seen_date.get(est_baseline)
+    low_first = first_seen_date.get(est_low)
 
     alerts = []
     for np_ in unique_prices:
         if np_ in known: continue
         cnt_p = cnt[np_]
         pct_p = cnt_p/n*100
-        # Outlier filter
         if cnt_p < outlier_min_count or pct_p < outlier_min_pct: continue
-        # Classification by absolute position relative to established H-L:
-        # - above est_high → brand raised the regular price (Novo High)
-        # - below est_low  → brand ran a deeper-than-usual promo (Novo Low)
-        # - between:       → proximity determines which cluster it replaces
-        if np_ > est_high:
-            kind = "Novo High ↑"; old_val = est_high; new_prof = (1-est_low/np_)*100
-        elif np_ < est_low:
-            kind = "Novo Low ↓";  old_val = est_low;  new_prof = (1-np_/est_high)*100
-        else:
-            dist_high = abs(np_ - est_high)
-            dist_low  = abs(np_ - est_low)
-            if dist_low <= dist_high:
-                kind = "Novo Low ↓";  old_val = est_low;  new_prof = (1-np_/est_high)*100
+
+        np_first = first_seen_date.get(np_)
+        dist_b = abs(np_ - est_baseline)
+        dist_l = abs(np_ - est_low)
+
+        if np_ > est_baseline:
+            if np_first < bl_first:
+                kind="Novo Baseline ↑"; old_v=np_; new_v=est_baseline
+                new_prof=(1-est_low/est_baseline)*100
             else:
-                kind = "Novo High ↑"; old_val = est_high; new_prof = (1-est_low/np_)*100
-        alerts.append({"tipo":kind,"preco_anterior":old_val,"preco_novo":np_,
+                kind="Novo Baseline ↑"; old_v=est_baseline; new_v=np_
+                new_prof=(1-est_low/np_)*100
+        elif np_ < est_low:
+            if np_first < low_first:
+                kind="Novo Low ↓"; old_v=np_; new_v=est_low
+                new_prof=(1-est_low/est_baseline)*100
+            else:
+                kind="Novo Low ↓"; old_v=est_low; new_v=np_
+                new_prof=(1-np_/est_baseline)*100
+        elif dist_l <= dist_b:
+            if np_first < low_first:
+                kind="Novo Low ↓"; old_v=np_; new_v=est_low
+                new_prof=(1-est_low/est_baseline)*100
+            else:
+                kind="Novo Low ↓"; old_v=est_low; new_v=np_
+                new_prof=(1-np_/est_baseline)*100
+        else:
+            if np_first < bl_first:
+                kind="Novo Baseline ↑"; old_v=np_; new_v=est_baseline
+                new_prof=(1-est_low/est_baseline)*100
+            else:
+                kind="Novo Baseline ↑"; old_v=est_baseline; new_v=np_
+                new_prof=(1-est_low/np_)*100
+
+        alerts.append({"tipo":kind,"preco_anterior":round(old_v,2),"preco_novo":round(new_v,2),
                         "prof_anterior":round(prof,1),"prof_nova":round(new_prof,1),
                         "n_leituras":cnt_p,"pct_leituras":round(pct_p,1)})
-    return {"tipo":"High-Low","preco_high":est_high,"preco_low":est_low,
+
+    return {"tipo":"High-Low","preco_high":est_baseline,"preco_low":est_low,
             "prof_promo":round(prof,1),"alerta":alerts if alerts else None}
 
 @st.cache_data(ttl=300)
