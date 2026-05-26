@@ -137,7 +137,7 @@ FORMATO_OPTIONS = ["Bars","Bites","Bites - PromoPack","Cakes","Cones","Cups",
                    "Frozen Fruits","Other","Pints","Pints - PromoPack",
                    "Pots","Sandwich","Sticks","Tubs"]
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)
 def load_glossario_csv_from_github():
     """Try to load glossario_formato.csv from the same repo as the app.
     Returns a dict or empty dict if file not found."""
@@ -193,7 +193,7 @@ def import_glossario_csv(uploaded_csv):
     except Exception as e:
         return f"Erro: {e}"
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)
 def load_glossario_df():
     """Load the full glossario CSV including Marca Padronizada."""
     try:
@@ -1035,16 +1035,27 @@ with tab5:
     )
     st.markdown(f"Actualmente tem **{len(glossario)} classificações** no glossário desta sessão.")
 
-    st.download_button(
-        label="⬇️ Descarregar glossário (glossario_formato.csv)",
-        data=csv_gl,
-        file_name="glossario_formato.csv",
-        mime="text/csv",
-        key="dl_glossario",
-        use_container_width=True,
-        type="primary",
-    )
-    st.caption("ℹ️ Após descarregar, faz upload do ficheiro para o repositório GitHub. O app lê-o automaticamente ao arrancar.")
+    dl_col, reload_col = st.columns([3, 1])
+    with dl_col:
+        st.download_button(
+            label="⬇️ Descarregar glossário (glossario_formato.csv)",
+            data=csv_gl,
+            file_name="glossario_formato.csv",
+            mime="text/csv",
+            key="dl_glossario",
+            use_container_width=True,
+            type="primary",
+        )
+    with reload_col:
+        if st.button("🔄 Forçar recarga do GitHub", use_container_width=True, key="force_reload"):
+            load_glossario_csv_from_github.clear()
+            load_glossario_df.clear()
+            # Also reset session state glossario so it re-seeds from GitHub
+            if GLOSSARIO_KEY in st.session_state:
+                del st.session_state[GLOSSARIO_KEY]
+            st.success("Cache limpo! A recarregar...")
+            st.rerun()
+    st.caption("ℹ️ Após fazer upload para o GitHub, clica em **Forçar recarga** para ver as alterações imediatamente.")
 
     st.markdown("---")
 
