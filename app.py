@@ -413,11 +413,12 @@ st.markdown("""
 </p>""", unsafe_allow_html=True)
 
 # ── Tabs first ─────────────────────────────────────────────────────────────────
-tab1, tab2, tab4, tab5 = st.tabs([
+tab1, tab2, tab4, tab5, tab6 = st.tabs([
     "🆕 Produtos Novos",
     "📣 Alerta de Mudança de Preço",
     "📊 Montar Gráficos",
     "🏷️ Classificar SKUs",
+    "🔬 Análise de Clusters (Beta)",
 ])
 
 # ── Slim KPI bar (below tabs) ───────────────────────────────────────────────────
@@ -966,6 +967,40 @@ with tab4:
         )
         st.plotly_chart(fig4, use_container_width=True, key="chart_tab4_multi")
 
+        # ── Summary table below chart ─────────────────────────────────────────
+        st.markdown("#### Tabela de SKUs no gráfico")
+        # Build summary from sku_cls
+        pids_in_chart = dg[["PID","Retalhista"]].drop_duplicates()
+        tbl4 = pids_in_chart.merge(
+            sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Alert_Label","Alertas"]],
+            on=["PID","Retalhista"], how="left"
+        )
+        tbl4 = tbl4.merge(
+            df_sku_list[["PID","Retalhista","Nome","Marca","Quantidade"]],
+            on=["PID","Retalhista"], how="left"
+        )
+        tbl4 = tbl4.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+
+        # Get new baseline/low from alerts
+        def get_new_bl(alertas):
+            if not alertas: return "—"
+            nbs = [a for a in alertas if "Baseline" in a["tipo"]]
+            return f"{nbs[-1]['preco_novo']:.2f} €" if nbs else "—"
+        def get_new_low(alertas):
+            if not alertas: return "—"
+            nls = [a for a in alertas if "Low" in a["tipo"]]
+            return f"{nls[-1]['preco_novo']:.2f} €" if nls else "—"
+
+        tbl4["Baseline €"]     = tbl4["Preco_High"].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "—")
+        tbl4["Low €"]          = tbl4["Preco_Low"].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "—")
+        tbl4["Novo Baseline €"]= tbl4["Alertas"].apply(lambda x: get_new_bl(x) if x else "—")
+        tbl4["Novo Low €"]     = tbl4["Alertas"].apply(lambda x: get_new_low(x) if x else "—")
+        tbl4["Alerta"]         = tbl4["Alert_Label"].fillna("")
+
+        disp4 = tbl4[["Formato","Marca","Nome","Quantidade","Baseline €","Low €","Novo Baseline €","Novo Low €"]].copy()
+        disp4 = disp4.sort_values(["Formato","Marca","Nome"])
+        st.dataframe(disp4, use_container_width=True, hide_index=True)
+
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 5 — SKUs NÃO CLASSIFICADOS
@@ -1118,6 +1153,204 @@ with tab5:
                     "Formato": fmt,
                 })
             st.dataframe(pd.DataFrame(gl_view), use_container_width=True, hide_index=True)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# TAB 6 — ANÁLISE DE CLUSTERS (Beta)
+# ═══════════════════════════════════════════════════════════════════
+with tab6:
+    st.markdown('<div class="section-header">🔬 Análise de Clusters <span style="font-size:.75rem;color:#888;font-family:DM Sans,sans-serif">(Beta)</span></div>', unsafe_allow_html=True)
+    st.markdown("Agrupa SKUs por padrão de preço (Baseline + Low dentro de ±0.05 €). Hierarquia: **Retalhista → Marca → Formato → Cluster**.")
+
+    # ── Filters ──────────────────────────────────────────────────────────────
+    cl_a, cl_b, cl_c, cl_d = st.columns(4)
+    with cl_a:
+        cl_ret = st.multiselect("Retalhista", retailers_sel, default=retailers_sel[:1], key="cl_ret")
+    with cl_b:
+        cl_fmt_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
+        cl_fmt = st.multiselect("Formato", cl_fmt_opts, default=cl_fmt_opts[:1] if cl_fmt_opts else [], key="cl_fmt")
+    with cl_c:
+        mp_opts_cl = sorted(df["Marca Padronizada"].dropna().unique()) if "Marca Padronizada" in df.columns else sorted(df["Marca"].dropna().unique())
+        cl_marca = st.multiselect("Marca", mp_opts_cl, key="cl_marca")
+    with cl_d:
+        cl_tol = st.slider("Tolerância (€)", min_value=0.01, max_value=0.20, value=0.05, step=0.01, key="cl_tol")
+
+    st.markdown("---")
+
+    # ── Build SKU summary ────────────────────────────────────────────────────
+    @st.cache_data(ttl=300)
+    def build_sku_summary(df_input, df_gl):
+        """Build one row per SKU×Retalhista with current Baseline, Low, Formato, Marca Padronizada."""
+        from collections import Counter as _C
+        records = []
+        for (pid, ret), grp in df_input.groupby(["PID","Retalhista"]):
+            grp = grp.sort_values("Data")
+            prices = grp["Preco"].tolist()
+            cnt = _C(prices)
+            n = len(prices)
+            if n == 0: continue
+            most_freq_pct = cnt.most_common(1)[0][1] / n
+            if most_freq_pct >= 0.90 or len(set(prices)) == 1:
+                bl, low = max(prices), None
+            else:
+                top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
+                bl, low = max(top2), min(top2)
+            gl_r = df_gl[df_gl["PID"]==pid]
+            fmt   = gl_r["Formato"].iloc[0]           if not gl_r.empty and pd.notna(gl_r["Formato"].iloc[0]) else None
+            marca = gl_r["Marca Padronizada"].iloc[0]  if not gl_r.empty and "Marca Padronizada" in gl_r.columns and pd.notna(gl_r["Marca Padronizada"].iloc[0]) else grp["Marca"].iloc[0]
+            qtd   = gl_r["Quantidade"].iloc[0]         if not gl_r.empty and pd.notna(gl_r["Quantidade"].iloc[0]) else grp["Quantidade"].iloc[0]
+            records.append({"PID":pid,"Retalhista":ret,"Nome":grp["Nome"].iloc[0],
+                            "Marca":marca,"Formato":fmt,"Quantidade":str(qtd),
+                            "Baseline":bl,"Low":low if low else bl})
+        return pd.DataFrame(records)
+
+    df_sku_sum = build_sku_summary(df, df_gl_full if not df_gl_full.empty else pd.DataFrame())
+
+    # Apply filters
+    cl_filtered = df_sku_sum.copy()
+    if cl_ret:   cl_filtered = cl_filtered[cl_filtered["Retalhista"].isin(cl_ret)]
+    if cl_fmt:   cl_filtered = cl_filtered[cl_filtered["Formato"].isin(cl_fmt)]
+    if cl_marca: cl_filtered = cl_filtered[cl_filtered["Marca"].isin(cl_marca)]
+    cl_filtered = cl_filtered.dropna(subset=["Baseline"])
+
+    if cl_filtered.empty:
+        st.info("Nenhum SKU com os filtros seleccionados.")
+    else:
+        # ── Cluster algorithm ─────────────────────────────────────────────────
+        TOLERANCE = cl_tol
+        cluster_rows = []   # for table
+        chart_rows   = []   # for chart
+
+        # Group by Retalhista → Marca → Formato
+        for (ret, marca, fmt), grp in cl_filtered.groupby(["Retalhista","Marca","Formato"]):
+            grp = grp.sort_values(["Baseline","Low"])
+            clusters = []
+            for _, row in grp.iterrows():
+                placed = False
+                for cl_obj in clusters:
+                    if (abs(row["Baseline"] - cl_obj["bl"]) <= TOLERANCE and
+                        abs(row["Low"]      - cl_obj["low"]) <= TOLERANCE):
+                        cl_obj["members"].append(row)
+                        placed = True; break
+                if not placed:
+                    clusters.append({"bl":row["Baseline"],"low":row["Low"],"members":[row]})
+
+            for i, cl_obj in enumerate(clusters):
+                letter = chr(65 + i)
+                cl_label = f"{marca} — Cluster {letter}"
+                members = cl_obj["members"]
+                # Aggregate: use median of members for the bar
+                bl_val  = round(np.median([m["Baseline"] for m in members]), 2)
+                low_val = round(np.median([m["Low"]      for m in members]), 2)
+                prof    = round((1 - low_val/bl_val)*100, 1) if bl_val > 0 else 0
+                nomes   = "<br>".join(f"• {m['Nome'][:55]}" for m in members)
+                qtds    = ", ".join(set(m["Quantidade"] for m in members if m["Quantidade"]))
+
+                chart_rows.append({
+                    "Retalhista": ret, "Marca": marca, "Formato": fmt,
+                    "Cluster":    cl_label, "Cluster_Letter": letter,
+                    "Baseline":   bl_val, "Low": low_val,
+                    "Prof_%":     prof, "N_SKUs": len(members),
+                    "Produtos":   nomes,
+                })
+                for m in members:
+                    cluster_rows.append({
+                        "Retalhista": ret, "Marca": marca, "Formato": fmt,
+                        "Cluster": f"Cluster {letter}",
+                        "Nome": m["Nome"], "Quantidade": m["Quantidade"],
+                        "Baseline €": f"{m['Baseline']:.2f}",
+                        "Low €": f"{m['Low']:.2f}",
+                        "Prof.%": f"{round((1-m['Low']/m['Baseline'])*100,1)}%" if m['Baseline']>0 else "—",
+                    })
+
+        df_chart = pd.DataFrame(chart_rows)
+        df_table = pd.DataFrame(cluster_rows)
+
+        if df_chart.empty:
+            st.info("Sem clusters para mostrar.")
+        else:
+            # ── KPIs ──────────────────────────────────────────────────────────
+            n_clusters = len(df_chart)
+            n_skus_cl  = len(df_table)
+            n_marcas   = df_chart["Marca"].nunique()
+            k1,k2,k3 = st.columns(3)
+            k1.markdown(f'<div class="kpi-item"><h4>Marcas</h4><p>{n_marcas}</p></div>', unsafe_allow_html=True)
+            k2.markdown(f'<div class="kpi-item"><h4>Clusters</h4><p>{n_clusters}</p></div>', unsafe_allow_html=True)
+            k3.markdown(f'<div class="kpi-item"><h4>SKUs</h4><p>{n_skus_cl}</p></div>', unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # ── Chart: horizontal range bars ─────────────────────────────────
+            st.markdown("#### Mapa de Preços por Cluster")
+            st.caption("Cada barra mostra o intervalo Low → Baseline. Passa o cursor para ver os produtos.")
+
+            # Sort by Marca then Baseline
+            df_chart = df_chart.sort_values(["Marca","Baseline","Low"], ascending=[True,False,False])
+
+            fig_cl = go.Figure()
+
+            # One trace per cluster = horizontal bar from Low to Baseline
+            colors_cl = px.colors.qualitative.Bold + px.colors.qualitative.Pastel
+            marca_colors = {m: colors_cl[i % len(colors_cl)]
+                            for i, m in enumerate(df_chart["Marca"].unique())}
+
+            for _, row in df_chart.iterrows():
+                color = marca_colors.get(row["Marca"], "#888")
+                hover = (
+                    f"<b>{row['Cluster']}</b><br>"
+                    f"Formato: {row['Formato']}<br>"
+                    f"Baseline: <b>{row['Baseline']:.2f} €</b><br>"
+                    f"Low: <b>{row['Low']:.2f} €</b><br>"
+                    f"Prof.: <b>{row['Prof_%']:.1f}%</b><br>"
+                    f"SKUs ({row['N_SKUs']}):<br>{row['Produtos']}"
+                )
+                # Bar: from Low to Baseline
+                fig_cl.add_trace(go.Bar(
+                    x=[row["Baseline"] - row["Low"]],
+                    y=[row["Cluster"]],
+                    base=[row["Low"]],
+                    orientation="h",
+                    name=row["Marca"],
+                    marker=dict(color=color, opacity=0.85,
+                                line=dict(color=color, width=1.5)),
+                    hovertemplate=hover + "<extra></extra>",
+                    showlegend=row["Cluster"].endswith("Cluster A"),  # one legend per marca
+                ))
+                # Dot at Low
+                fig_cl.add_trace(go.Scatter(
+                    x=[row["Low"]], y=[row["Cluster"]],
+                    mode="markers", marker=dict(color=color, size=8, symbol="circle"),
+                    hoverinfo="skip", showlegend=False,
+                ))
+                # Dot at Baseline
+                fig_cl.add_trace(go.Scatter(
+                    x=[row["Baseline"]], y=[row["Cluster"]],
+                    mode="markers", marker=dict(color=color, size=8, symbol="diamond"),
+                    hoverinfo="skip", showlegend=False,
+                ))
+
+            fig_cl.update_layout(
+                height=max(350, n_clusters * 38),
+                barmode="overlay",
+                template="plotly_white",
+                xaxis=dict(title="Preço (€)", showgrid=True, gridcolor="#e5e7eb"),
+                yaxis=dict(title="", autorange="reversed",
+                           tickfont=dict(size=11)),
+                legend=dict(title="Marca", orientation="v",
+                            yanchor="top", y=1, xanchor="left", x=1.01,
+                            font=dict(size=10)),
+                margin=dict(t=20, b=40, l=10, r=150),
+                hovermode="closest",
+            )
+            st.plotly_chart(fig_cl, use_container_width=True, key="chart_clusters")
+
+            # ── Table ─────────────────────────────────────────────────────────
+            st.markdown("#### Tabela de Clusters")
+            for ret_val in sorted(df_table["Retalhista"].unique()):
+                st.markdown(retailer_header(ret_val), unsafe_allow_html=True)
+                sub_t = df_table[df_table["Retalhista"]==ret_val].copy()
+                sub_t = sub_t[["Marca","Formato","Cluster","Nome","Quantidade","Baseline €","Low €","Prof.%"]]
+                sub_t = sub_t.sort_values(["Marca","Formato","Cluster","Nome"])
+                st.dataframe(sub_t, use_container_width=True, hide_index=True)
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
