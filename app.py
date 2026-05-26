@@ -813,16 +813,33 @@ with tab4:
     if g_brand:  dg = dg[dg["Marca"].isin(g_brand)]
     if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
     if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
-    # Merge Formato for tab4 filter — use live glossario from session state
+    # Merge Formato for tab4 filter
     dg["PID"] = dg["PID"].astype(str)
+    # Build lookup from live session glossario
     live_glossario = load_glossario()
     live_fmt = build_formato_lookup(live_glossario, df_sku_list)
-    if not live_fmt.empty:
+    # Drop Formato col if already present from a previous merge
+    if "Formato" in dg.columns:
+        dg = dg.drop(columns=["Formato"])
+    if not live_fmt.empty and live_fmt["Formato"].notna().any():
         dg = dg.merge(live_fmt, on=["PID","Retalhista"], how="left")
     else:
-        dg["Formato"] = None
-    if g_fmt and "Formato" in dg.columns:
-        dg = dg[dg["Formato"].isin(g_fmt)]
+        # Fallback: try to read glossario_formato.csv directly
+        try:
+            gl_csv = pd.read_csv("glossario_formato.csv")
+            gl_csv["PID"] = gl_csv["PID"].astype(str)
+            gl_csv = gl_csv[["PID","Retalhista","Formato"]].dropna(subset=["Formato"])
+            if not gl_csv.empty:
+                dg = dg.merge(gl_csv, on=["PID","Retalhista"], how="left")
+            else:
+                dg["Formato"] = None
+        except Exception:
+            dg["Formato"] = None
+    if g_fmt:
+        if "Formato" not in dg.columns or dg["Formato"].isna().all():
+            st.warning("⚠️ O filtro Formato requer o ficheiro `glossario_formato.csv` no GitHub com classificações preenchidas.")
+        else:
+            dg = dg[dg["Formato"].isin(g_fmt)]
 
     # Apply strategy filter via sku_cls
     if g_tipo:
