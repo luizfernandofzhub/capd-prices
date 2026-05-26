@@ -277,15 +277,15 @@ def build_classifications(df_input):
     records = []
     for (pid, ret), grp in df_input.groupby(["PID","Retalhista"]):
         grp = grp.sort_values("Data")
-        cls = classify_sku(grp["Preco"].tolist())
+        cls = classify_sku(list(zip(grp["Data"].tolist(), grp["Preco"].tolist())))
         m = grp.iloc[0]
         pid = str(pid)  # normalise to str
-        has_high = cls["alerta"] and any("High" in a["tipo"] for a in cls["alerta"])
-        has_low  = cls["alerta"] and any("Low"  in a["tipo"] for a in cls["alerta"])
+        has_bl  = cls["alerta"] and any("Baseline" in a["tipo"] for a in cls["alerta"])
+        has_low = cls["alerta"] and any("Low"      in a["tipo"] for a in cls["alerta"])
         alert_label = None
-        if has_high and has_low: alert_label = "Novo High+Low"
-        elif has_high:           alert_label = "Novo High"
-        elif has_low:            alert_label = "Novo Low"
+        if has_bl and has_low: alert_label = "NB+NL"
+        elif has_bl:           alert_label = "NB"
+        elif has_low:          alert_label = "NL"
         fmt = m.get("Formato") if hasattr(m, "get") else (m["Formato"] if "Formato" in m.index else None)
         records.append({
             "PID":m["PID"],"Retalhista":ret,"Nome":m["Nome"],"Marca":m["Marca"],
@@ -374,7 +374,7 @@ st.markdown(f"""
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🆕 Produtos Novos",
-    "📈 Alerta de Mudança de Preço",
+    "📣 Alerta de Mudança de Preço",
     "📋 Todos os Produtos",
     "📊 Evolução de Preços",
     "🏷️ SKUs não classificados",
@@ -509,36 +509,33 @@ with tab1:
 # TAB 2 — ALERTA DE MUDANÇA DE PREÇO
 # ═══════════════════════════════════════════════════════════════════
 with tab2:
-    st.markdown('<div class="section-header">📈 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📣 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
 
     # ── Filters ──
-    # ── Period filter (affects price history chart; classifications use full history) ──
-    p2a, p2b = st.columns([1, 3])
-    with p2a:
-        period2 = st.date_input("Período de análise", value=(min_date, max_date),
+    # ── Row 1: period + search ────────────────────────────────────────────────
+    r1a, r1b, r1c = st.columns([1.2, 1, 2])
+    with r1a:
+        period2 = st.date_input("Período", value=(min_date, max_date),
                                  min_value=min_date, max_value=max_date, key="period2")
         p2_start, p2_end = (period2[0], period2[1]) if len(period2)==2 else (min_date, max_date)
-    with p2b:
-        st.caption("O período afecta o gráfico de evolução de preços. As classificações High/Low e alertas usam sempre o histórico completo.")
-
-    f2a, f2b, f2c, f2e, f2d = st.columns([1,1,1,1,2])
-    with f2a:
-        ret2 = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
-    with f2b:
-        brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
-    with f2c:
-        tipo2 = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
-    with f2e:
-        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
-        fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
-    with f2d:
+    with r1b:
+        only_alerts2 = st.checkbox("🚨 Apenas SKUs com alertas", value=True, key="chk_alerts2")
+        alert_type2  = st.multiselect("Tipo de alerta", ["NB","NL","NB+NL"], key="alert_type2")
+    with r1c:
         search2 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Ben & Jerry's", key="search2")
 
-    col_chk1, col_chk2 = st.columns(2)
-    with col_chk1:
-        only_alerts2 = st.checkbox("🚨 Apenas SKUs com alertas", value=False, key="chk_alerts2")
-    with col_chk2:
-        alert_type2 = st.multiselect("Tipo de alerta", ["Novo High","Novo Low","Novo High+Low"], key="alert_type2")
+    # ── Row 2: dimension filters ───────────────────────────────────────────────
+    r2a, r2b, r2c, r2d = st.columns(4)
+    with r2a:
+        ret2   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
+    with r2b:
+        brand2 = st.multiselect("Marca", sorted(sku_cls["Marca"].dropna().unique()), key="brand2")
+    with r2c:
+        tipo2  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
+    with r2d:
+        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
+        fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
+    st.caption("ℹ️ O período afecta apenas o gráfico. As classificações e alertas usam sempre o histórico completo.")
 
     # ── Filter ──
     cf = sku_cls[sku_cls["Retalhista"].isin(ret2 or retailers_sel)].copy()
@@ -547,7 +544,7 @@ with tab2:
     if search2: cf = cf[cf["Nome"].str.contains(search2, case=False, na=False)]
     if only_alerts2: cf = cf[cf["Alert_Label"].notna()]
     if alert_type2:  cf = cf[cf["Alert_Label"].isin(alert_type2)]
-    if fmt2:         cf = cf[cf["Formato"].isin(fmt2)]
+    if fmt2 and "Formato" in cf.columns: cf = cf[cf["Formato"].isin(fmt2)]
     cf["_ro"] = cf["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
     cf = cf.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
     # Ensure Formato is in cf (always merge from static lookup)
@@ -593,16 +590,25 @@ with tab2:
 </table>
 </details>""", unsafe_allow_html=True)
 
+        # FIX 6: legend
+        st.markdown(
+            '<div style="font-size:.78rem;color:#888;margin-bottom:.4rem;">' +
+            '<span style="background:#0891b2;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NB</span>Novo Baseline &nbsp;' +
+            '<span style="background:#db2777;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NL</span>Novo Low &nbsp;' +
+            '<span style="background:#7c3aed;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:4px">NHL</span>Novo Baseline + Novo Low' +
+            '</div>', unsafe_allow_html=True
+        )
         # ── Main table + detail ──
         sub_sorted = sub_ret.copy()
         # Build display rows
         rows_display = []
         for _, row in sub_sorted.iterrows():
             al = row["Alert_Label"]
-            if al == "Novo High+Low": alert_pill = '<span class="pill-both">⚡ Novo High+Low</span>'
-            elif al == "Novo High":   alert_pill = '<span class="pill-high">📈 Novo High</span>'
-            elif al == "Novo Low":    alert_pill = '<span class="pill-low">📉 Novo Low</span>'
-            else:                     alert_pill = ""
+            if al == "NB+NL": alert_icon = '<span style="background:#7c3aed;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NHL</span>'
+            elif al == "NB":   alert_icon = '<span style="background:#0891b2;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NB</span>'
+            elif al == "NL":   alert_icon = '<span style="background:#db2777;color:#fff;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:5px;letter-spacing:.03em">NL</span>'
+            else:              alert_icon = ""
+            alert_pill = alert_icon  # keep compat
 
             if row["Tipo_Preco"] == "Preço Único":
                 tipo_str  = '<span class="tag tag-pu">💰 Preço Único</span>'
@@ -615,10 +621,10 @@ with tab2:
                 low_str   = f'🟢 {row["Preco_Low"]:.2f} €'  if row["Preco_Low"]  else "—"
                 prof_str  = f'{row["Prof_Promo"]:.1f}%'      if row["Prof_Promo"] else "—"
                 als = row["Alertas"] or []
-                new_highs = [a for a in als if "High" in a["tipo"]]
+                new_highs = [a for a in als if "Baseline" in a["tipo"]]
                 new_lows  = [a for a in als if "Low"  in a["tipo"]]
-                new_h_str  = " | ".join(f'📈 {a["preco_novo"]:.2f}€' for a in new_highs) or "—"
-                new_l_str  = " | ".join(f'📉 {a["preco_novo"]:.2f}€' for a in new_lows)  or "—"
+                new_h_str  = " | ".join(f'📈 {a["preco_anterior"]:.2f}→{a["preco_novo"]:.2f}€' for a in new_highs) or "—"
+                new_l_str  = " | ".join(f'📉 {a["preco_anterior"]:.2f}→{a["preco_novo"]:.2f}€' for a in new_lows)  or "—"
                 # New prof = from most recent alert
                 all_als = new_highs + new_lows
                 new_prof_str = f'{all_als[-1]["prof_nova"]:.1f}%' if all_als else "—"
@@ -626,12 +632,12 @@ with tab2:
             _fv = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
             fmt_val = str(_fv) if (_fv is not None and str(_fv) not in ("nan","<NA>","None","")) else "—"
             rows_display.append({
+                "⚑":alert_icon,
                 "PID":row["PID"], "Nome":row["Nome"], "Marca":row["Marca"],
                 "Quantidade":row["Quantidade"], "Formato": fmt_val if pd.notna(fmt_val) else "—",
                 "Estratégia":row["Tipo_Preco"],
-                "High":high_str, "Low":low_str, "Prof.%":prof_str,
-                "Novo High":new_h_str, "Novo Low":new_l_str, "Nova Prof.%":new_prof_str,
-                "Alerta":al or "",
+                "Baseline":high_str, "Low":low_str, "Prof.%":prof_str,
+                "Novo Baseline":new_h_str, "Novo Low":new_l_str, "Nova Prof.%":new_prof_str,
             })
 
         df_display = pd.DataFrame(rows_display)
