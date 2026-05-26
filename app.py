@@ -386,12 +386,11 @@ st.markdown("""
 </p>""", unsafe_allow_html=True)
 
 # ── Tabs first ─────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab4, tab5 = st.tabs([
     "🆕 Produtos Novos",
     "📣 Alerta de Mudança de Preço",
-    "📋 Todos os Produtos",
-    "📊 Evolução de Preços",
-    "🏷️ SKUs não classificados",
+    "📊 Montar Gráficos",
+    "🏷️ Classificar SKUs",
 ])
 
 # ── Slim KPI bar (below tabs) ───────────────────────────────────────────────────
@@ -784,68 +783,10 @@ with tab2:
         st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════════════
-# TAB 3 — TODOS OS PRODUTOS
-# ═══════════════════════════════════════════════════════════════════
-with tab3:
-    st.markdown('<div class="section-header">📋 Todos os Produtos</div>', unsafe_allow_html=True)
-    fa, fb, fc, fd, fe = st.columns(5)
-    with fa:
-        f_ret  = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="f_ret_all")
-    with fb:
-        f_brand = st.multiselect("Marca", sorted(df["Marca"].dropna().unique()), key="f_brand_all")
-    with fc:
-        f_size  = st.multiselect("Tamanho", sorted(df["Quantidade"].dropna().astype(str).unique()), key="f_size_all")
-    with fe:
-        all_fmts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
-        f_fmt = st.multiselect("Formato", all_fmts, key="f_fmt_all")
-    with fd:
-        f_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="f_period_all")
-        fp_s, fp_e = (f_period[0],f_period[1]) if len(f_period)==2 else (min_date,max_date)
-    f_search3 = st.text_input("🔎 Pesquisar por nome", placeholder="ex: Häagen-Dazs, Cornetto…", key="search3")
-
-    df3 = df[(df["Data"].dt.date>=fp_s)&(df["Data"].dt.date<=fp_e)].copy()
-    if f_ret:    df3 = df3[df3["Retalhista"].isin(f_ret)]
-    if f_brand:  df3 = df3[df3["Marca"].isin(f_brand)]
-    if f_size:   df3 = df3[df3["Quantidade"].astype(str).isin(f_size)]
-    if f_search3:df3 = df3[df3["Nome"].str.contains(f_search3, case=False, na=False)]
-    # Formato filter applied after merge (see below)
-
-    all_sum = (df3.groupby(["PID","Retalhista","Nome","Marca","Quantidade"])["Preco"]
-               .agg(Preco_Atual="last", Preco_Min="min", Preco_Max="max", Leituras="count").reset_index())
-    cls_m = sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Prof_Promo","Alert_Label"]].copy()
-    cls_m["PID"] = cls_m["PID"].astype(str)
-    all_sum["PID"] = all_sum["PID"].astype(str)
-    all_sum = all_sum.merge(cls_m, on=["PID","Retalhista"], how="left")
-    # Merge Formato from static lookup (robust to cache/column-missing issues)
-    all_sum["PID"] = all_sum["PID"].astype(str)
-    all_sum = all_sum.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    if f_fmt: all_sum = all_sum[all_sum["Formato"].isin(f_fmt)]
-    all_sum["Prof_Promo"] = all_sum["Prof_Promo"].fillna(
-        ((1-all_sum["Preco_Min"]/all_sum["Preco_Max"])*100).round(1))
-    all_sum["_ro"] = all_sum["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
-    all_sum = all_sum.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
-
-    st.markdown(f"**{len(all_sum)} produto(s)** encontrado(s)")
-    for ret in RETAILER_ORDER:
-        sub = all_sum[all_sum["Retalhista"]==ret]
-        if sub.empty: continue
-        count_b3 = f'<span style="font-size:.85rem;color:#888">{len(sub)} SKUs</span>'
-        st.markdown(retailer_header(ret, count_b3), unsafe_allow_html=True)
-        d = sub[["PID","Nome","Marca","Quantidade","Formato","Tipo_Preco","Preco_Atual","Preco_Min","Preco_Max","Prof_Promo","Alert_Label","Leituras"]].copy()
-        d.columns = ["ID","Nome","Marca","Tamanho","Formato","Estratégia","Preço Atual €","Mín €","Máx €","Prof. Promo %","Alerta","Leituras"]
-        d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
-        d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
-        d["Máx €"]         = d["Máx €"].map("{:.2f}".format)
-        d["Prof. Promo %"] = d["Prof. Promo %"].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x>0 else "—")
-        d["Formato"]       = d["Formato"].fillna("—")
-        d["Alerta"]        = d["Alerta"].apply(lambda x: ("⚡ "+x) if pd.notna(x) and x else "")
-        st.dataframe(d, use_container_width=True, hide_index=True)
-
-# ═══════════════════════════════════════════════════════════════════
-# TAB 4 — EVOLUÇÃO DE PREÇOS (multi-SKU chart)
+# TAB 4 — MONTAR GRÁFICOS
 # ═══════════════════════════════════════════════════════════════════
 with tab4:
-    st.markdown('<div class="section-header">📊 Evolução de Preços</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📊 Montar Gráficos</div>', unsafe_allow_html=True)
     st.markdown("Seleciona os filtros para visualizar a evolução histórica de múltiplos SKUs num único gráfico.")
 
     g1, g2, g3, g4, g5, g6 = st.columns(6)
@@ -875,7 +816,7 @@ with tab4:
     # Merge Formato for tab4 filter
     dg["PID"] = dg["PID"].astype(str)
     dg = dg.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    if g_fmt: dg = dg[dg["Formato"].isin(g_fmt)]
+    if g_fmt and "Formato" in dg.columns: dg = dg[dg["Formato"].isin(g_fmt)]
 
     # Apply strategy filter via sku_cls
     if g_tipo:
@@ -926,7 +867,7 @@ with tab4:
 # TAB 5 — SKUs NÃO CLASSIFICADOS
 # ═══════════════════════════════════════════════════════════════════
 with tab5:
-    st.markdown('<div class="section-header">🏷️ Glossário de Formatos</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">🏷️ Classificar SKUs</div>', unsafe_allow_html=True)
 
     glossario = load_glossario()
 
