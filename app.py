@@ -1162,25 +1162,10 @@ with tab6:
     st.markdown('<div class="section-header">🔬 Análise de Clusters <span style="font-size:.75rem;color:#888;font-family:DM Sans,sans-serif">(Beta)</span></div>', unsafe_allow_html=True)
     st.markdown("Agrupa SKUs por padrão de preço (Baseline + Low dentro de ±0.05 €). Hierarquia: **Retalhista → Marca → Formato → Cluster**.")
 
-    # ── Filters ──────────────────────────────────────────────────────────────
-    cl_a, cl_b, cl_c, cl_d = st.columns(4)
-    with cl_a:
-        cl_ret = st.multiselect("Retalhista", retailers_sel, default=retailers_sel[:1], key="cl_ret")
-    with cl_b:
-        cl_fmt_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
-        cl_fmt = st.multiselect("Formato", cl_fmt_opts, default=cl_fmt_opts[:1] if cl_fmt_opts else [], key="cl_fmt")
-    with cl_c:
-        mp_opts_cl = sorted(df["Marca Padronizada"].dropna().unique()) if "Marca Padronizada" in df.columns else sorted(df["Marca"].dropna().unique())
-        cl_marca = st.multiselect("Marca", mp_opts_cl, key="cl_marca")
-    with cl_d:
-        cl_tol = st.slider("Tolerância (€)", min_value=0.01, max_value=0.20, value=0.05, step=0.01, key="cl_tol")
-
-    st.markdown("---")
-
-    # ── Build SKU summary ────────────────────────────────────────────────────
+    # ── Cascading filters ─────────────────────────────────────────────────────
+    # Build SKU summary first (needed for cascade)
     @st.cache_data(ttl=300)
-    def build_sku_summary(df_input, df_gl):
-        """Build one row per SKU×Retalhista with current Baseline, Low, Formato, Marca Padronizada."""
+    def build_sku_summary_cached(df_input, df_gl):
         from collections import Counter as _C
         records = []
         for (pid, ret), grp in df_input.groupby(["PID","Retalhista"]):
@@ -1195,7 +1180,7 @@ with tab6:
             else:
                 top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
                 bl, low = max(top2), min(top2)
-            gl_r = df_gl[df_gl["PID"]==pid]
+            gl_r = df_gl[df_gl["PID"]==pid] if not df_gl.empty else pd.DataFrame()
             fmt   = gl_r["Formato"].iloc[0]           if not gl_r.empty and pd.notna(gl_r["Formato"].iloc[0]) else None
             marca = gl_r["Marca Padronizada"].iloc[0]  if not gl_r.empty and "Marca Padronizada" in gl_r.columns and pd.notna(gl_r["Marca Padronizada"].iloc[0]) else grp["Marca"].iloc[0]
             qtd   = gl_r["Quantidade"].iloc[0]         if not gl_r.empty and pd.notna(gl_r["Quantidade"].iloc[0]) else grp["Quantidade"].iloc[0]
@@ -1204,10 +1189,41 @@ with tab6:
                             "Baseline":bl,"Low":low if low else bl})
         return pd.DataFrame(records)
 
-    df_sku_sum = build_sku_summary(df, df_gl_full if not df_gl_full.empty else pd.DataFrame())
+    df_sku_sum_cl = build_sku_summary_cached(df, df_gl_full if not df_gl_full.empty else pd.DataFrame())
 
-    # Apply filters
-    cl_filtered = df_sku_sum.copy()
+    cl_a, cl_b, cl_c, cl_d = st.columns(4)
+    with cl_a:
+        cl_ret = st.multiselect("Retalhista", retailers_sel, default=retailers_sel[:1], key="cl_ret")
+
+    # Formato options: only those present in selected retailers
+    if cl_ret:
+        fmt_pool = df_sku_sum_cl[df_sku_sum_cl["Retalhista"].isin(cl_ret)]
+    else:
+        fmt_pool = df_sku_sum_cl.copy()
+    cl_fmt_opts = sorted(fmt_pool["Formato"].dropna().unique())
+
+    with cl_b:
+        cl_fmt = st.multiselect("Formato", cl_fmt_opts,
+                                default=cl_fmt_opts[:1] if cl_fmt_opts else [],
+                                key="cl_fmt")
+
+    # Marca options: only those present in selected retailers × formats
+    if cl_fmt:
+        marca_pool = fmt_pool[fmt_pool["Formato"].isin(cl_fmt)]
+    else:
+        marca_pool = fmt_pool.copy()
+    cl_marca_opts = sorted(marca_pool["Marca"].dropna().unique())
+
+    with cl_c:
+        cl_marca = st.multiselect("Marca", cl_marca_opts, key="cl_marca")
+
+    with cl_d:
+        cl_tol = st.slider("Tolerância (€)", min_value=0.01, max_value=0.20, value=0.05, step=0.01, key="cl_tol")
+
+    st.markdown("---")
+
+    # Apply filters (using df_sku_sum_cl built above)
+    cl_filtered = df_sku_sum_cl.copy()
     if cl_ret:   cl_filtered = cl_filtered[cl_filtered["Retalhista"].isin(cl_ret)]
     if cl_fmt:   cl_filtered = cl_filtered[cl_filtered["Formato"].isin(cl_fmt)]
     if cl_marca: cl_filtered = cl_filtered[cl_filtered["Marca"].isin(cl_marca)]
