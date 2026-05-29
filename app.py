@@ -16,20 +16,6 @@ st.set_page_config(
 
 _LAST_UPDATE = "29/Maio/2026"
 
-st.markdown(f"""
-<div style="
-  background:#1a1a1a;
-  color:#d4d4d4;
-  font-family:'DM Sans',sans-serif;
-  font-size:.78rem;
-  text-align:center;
-  padding:.38rem 1rem;
-  letter-spacing:.04em;
-  position:sticky;top:0;z-index:9999;">
-  🕒 <strong>Última atualização em:</strong> {_LAST_UPDATE}
-</div>
-""", unsafe_allow_html=True)
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -420,7 +406,11 @@ df_sku_meta = (df.sort_values("Data")
                [["PID","Retalhista","Nome","Marca","Quantidade","Formato"]])
 
 # ── Header ─────────────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
+<div style='background:#1a1a1a;color:#d4d4d4;font-size:.78rem;text-align:center;
+            padding:.42rem 1rem;border-radius:6px;margin-bottom:.6rem;letter-spacing:.04em;'>
+  🕒 <strong>Última atualização em:</strong> {{_LAST_UPDATE}}
+</div>
 <h1 style='font-family:"DM Serif Display",serif;font-size:2.2rem;margin-bottom:.1rem;'>
     Monitoramento de Preços | IceCream Portugal
 </h1>
@@ -610,7 +600,7 @@ with tab2:
     with r2b:
         tipo2  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
     with r2c:
-        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if not df_fmt_lookup.empty else []
+        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if (not df_fmt_lookup.empty and "Formato" in df_fmt_lookup.columns) else []
         fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
     with r2d:
         st.caption("ℹ️ O período seleccionado afecta todos os cálculos de alertas e o gráfico.")
@@ -861,7 +851,7 @@ with tab4:
         _dg_pool2 = _dg_pool.copy()
     _dg_pool2["PID"] = _dg_pool2["PID"].astype(str)
     _pool2_fmt = _dg_pool2.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    _fmt_opts4 = sorted(_pool2_fmt["Formato"].dropna().unique()) if not _pool2_fmt.empty else []
+    _fmt_opts4 = sorted(_pool2_fmt["Formato"].dropna().unique()) if (not _pool2_fmt.empty and "Formato" in _pool2_fmt.columns) else []
 
     with g3:
         g_fmt = st.multiselect("Formato", _fmt_opts4, key="g_fmt")
@@ -1464,7 +1454,10 @@ with tab_now:
     _now_full["PID"] = _now_full["PID"].astype(str)
     if "Formato" in _now_full.columns:
         _now_full = _now_full.drop(columns=["Formato"])
-    _now_full = _now_full.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+    if not df_fmt_lookup.empty:
+        _now_full = _now_full.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+    if "Formato" not in _now_full.columns:
+        _now_full["Formato"] = None
 
     # ── Left sidebar-style filters (columns layout) ───────────────────────────
     left_f, right_tbl = st.columns([1, 3])
@@ -1488,7 +1481,7 @@ with tab_now:
             _now_pool2 = _now_pool[_now_pool[_marca_col].isin(now_marca)]
         else:
             _now_pool2 = _now_pool.copy()
-        _now_fmt_opts = sorted(_now_pool2["Formato"].dropna().unique())
+        _now_fmt_opts = sorted(_now_pool2["Formato"].dropna().unique()) if "Formato" in _now_pool2.columns else []
         now_fmt = st.multiselect("Formato", _now_fmt_opts, key="now_fmt")
 
         # Cascading: Tamanho
@@ -1550,7 +1543,7 @@ with tab_now:
             for nome, grp in _sku_groups:
                 marca_v = grp[_marca_col].iloc[0] if _marca_col in grp.columns else grp["Marca"].iloc[0]
                 qtd_v   = str(grp["Quantidade"].iloc[0]) if pd.notna(grp["Quantidade"].iloc[0]) else "—"
-                fmt_v   = str(grp["Formato"].iloc[0]) if pd.notna(grp["Formato"].iloc[0]) else "—"
+                fmt_v   = str(grp["Formato"].iloc[0]) if ("Formato" in grp.columns and pd.notna(grp["Formato"].iloc[0])) else "—"
                 row_d   = {"Nome": nome, "Marca": marca_v, "Formato": fmt_v, "Qtd": qtd_v}
                 for ret_v in RETAILER_ORDER:
                     sub_r = grp[grp["Retalhista"]==ret_v]
