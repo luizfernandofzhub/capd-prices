@@ -1423,35 +1423,37 @@ with tab6:
 # ═══════════════════════════════════════════════════════════════════
 with tab_now:
     st.markdown('<div class="section-header">🔍 Preço Agora</div>', unsafe_allow_html=True)
-    st.markdown("Consulta o **preço mais recente** de cada SKU em cada retalhista, com o Máximo e Mínimo dos últimos 30 dias.")
+    st.markdown("Preço **mais recente** de cada SKU por retalhista. Passe o cursor sobre um preço para ver Mín/Máx dos últimos 30 dias.")
 
     # ── Build "now" dataset ───────────────────────────────────────────────────
-    # Latest price per PID × Retalhista
     _now_latest = (df.sort_values("Data")
                    .groupby(["PID","Retalhista"]).last()
                    .reset_index()
                    [["PID","Retalhista","Nome","Marca","Quantidade","Preco","Data"]])
     _now_latest.rename(columns={"Preco":"Preco_Atual","Data":"Data_Leitura"}, inplace=True)
+    _now_latest["PID"] = _now_latest["PID"].astype(str)
 
-    # Min/Max last 30 days
     _cutoff_30 = pd.Timestamp(max_date) - timedelta(days=30)
     _df_30 = df[df["Data"] >= _cutoff_30]
     _stats_30 = (_df_30.groupby(["PID","Retalhista"])["Preco"]
-                 .agg(Min_30d="min", Max_30d="max")
-                 .reset_index())
+                 .agg(Min_30d="min", Max_30d="max").reset_index())
+    _stats_30["PID"] = _stats_30["PID"].astype(str)
 
     _now_full = _now_latest.merge(_stats_30, on=["PID","Retalhista"], how="left")
 
-    # Merge Marca Padronizada
+    # Merge Marca Padronizada (same source as Clusters tab)
     if not df_gl_full.empty and "Marca Padronizada" in df_gl_full.columns:
-        _mp = df_gl_full[["PID","Retalhista","Marca Padronizada"]].drop_duplicates()
-        _now_full = _now_full.merge(_mp, on=["PID","Retalhista"], how="left")
-        _marca_col = "Marca Padronizada"
+        _mp_now = df_gl_full[["PID","Retalhista","Marca Padronizada"]].drop_duplicates()
+        _mp_now["PID"] = _mp_now["PID"].astype(str)
+        _now_full = _now_full.merge(_mp_now, on=["PID","Retalhista"], how="left")
+        # Fill missing Marca Padronizada with raw Marca
+        _now_full["Marca Padronizada"] = _now_full["Marca Padronizada"].fillna(_now_full["Marca"])
+        _now_marca_col = "Marca Padronizada"
     else:
-        _marca_col = "Marca"
+        _now_full["Marca Padronizada"] = _now_full["Marca"]
+        _now_marca_col = "Marca Padronizada"
 
     # Merge Formato
-    _now_full["PID"] = _now_full["PID"].astype(str)
     if "Formato" in _now_full.columns:
         _now_full = _now_full.drop(columns=["Formato"])
     if not df_fmt_lookup.empty:
@@ -1459,141 +1461,155 @@ with tab_now:
     if "Formato" not in _now_full.columns:
         _now_full["Formato"] = None
 
-    # ── Left sidebar-style filters (columns layout) ───────────────────────────
+    # ── Layout: filters left, table right ────────────────────────────────────
     left_f, right_tbl = st.columns([1, 3])
 
     with left_f:
         st.markdown("#### Filtros")
 
-        # Retalhista
-        _now_ret_opts = sorted(_now_full["Retalhista"].dropna().unique())
+        # ── Cascading pool (we derive all options from _now_full, cascading down) ──
+        # Step 1: Retalhista (no dependency)
+        _np0 = _now_full.copy()
+        _now_ret_opts = sorted(_np0["Retalhista"].dropna().unique())
         now_ret = st.multiselect("Retalhista", _now_ret_opts, default=_now_ret_opts, key="now_ret")
 
-        # Cascading: Marca
-        _now_pool = _now_full.copy()
-        if now_ret:
-            _now_pool = _now_pool[_now_pool["Retalhista"].isin(now_ret)]
-        _now_marca_opts = sorted(_now_pool[_marca_col].dropna().unique())
+        # Step 2: Marca — filtered by Retalhista
+        _np1 = _np0[_np0["Retalhista"].isin(now_ret)] if now_ret else _np0.copy()
+        _now_marca_opts = sorted(_np1[_now_marca_col].dropna().unique())
         now_marca = st.multiselect("Marca", _now_marca_opts, key="now_marca")
 
-        # Cascading: Formato
-        if now_marca:
-            _now_pool2 = _now_pool[_now_pool[_marca_col].isin(now_marca)]
-        else:
-            _now_pool2 = _now_pool.copy()
-        _now_fmt_opts = sorted(_now_pool2["Formato"].dropna().unique()) if "Formato" in _now_pool2.columns else []
+        # Step 3: Formato — filtered by Retalhista + Marca
+        _np2 = _np1[_np1[_now_marca_col].isin(now_marca)] if now_marca else _np1.copy()
+        _now_fmt_opts = sorted(_np2["Formato"].dropna().unique()) if "Formato" in _np2.columns else []
         now_fmt = st.multiselect("Formato", _now_fmt_opts, key="now_fmt")
 
-        # Cascading: Tamanho
-        if now_fmt:
-            _now_pool3 = _now_pool2[_now_pool2["Formato"].isin(now_fmt)]
-        else:
-            _now_pool3 = _now_pool2.copy()
-        _now_size_opts = sorted(_now_pool3["Quantidade"].dropna().astype(str).unique())
+        # Step 4: Tamanho — filtered by above
+        _np3 = _np2[_np2["Formato"].isin(now_fmt)] if now_fmt else _np2.copy()
+        _now_size_opts = sorted(_np3["Quantidade"].dropna().astype(str).unique())
         now_size = st.multiselect("Tamanho", _now_size_opts, key="now_size")
 
-        # Cascading: SKU
-        if now_size:
-            _now_pool4 = _now_pool3[_now_pool3["Quantidade"].astype(str).isin(now_size)]
-        else:
-            _now_pool4 = _now_pool3.copy()
-        _now_sku_opts = sorted(_now_pool4["Nome"].dropna().unique())
+        # Step 5: SKU — filtered by above
+        _np4 = _np3[_np3["Quantidade"].astype(str).isin(now_size)] if now_size else _np3.copy()
+        _now_sku_opts = sorted(_np4["Nome"].dropna().unique())
         now_sku = st.multiselect("SKU", _now_sku_opts, key="now_sku")
 
-        # Free-text search with dropdown feel
+        # Free-text search → click-to-add
         st.markdown("---")
-        st.markdown("**Pesquisa por nome**")
+        st.markdown("**Pesquisa rápida por nome**")
         now_search = st.text_input("", placeholder="ex: Magnum, Cornetto…",
                                     key="now_search", label_visibility="collapsed")
         if now_search:
-            _search_matches = sorted([n for n in _now_sku_opts
-                                       if now_search.lower() in n.lower()])[:20]
-            if _search_matches:
-                st.caption(f"{len(_search_matches)} resultado(s) — selecciona abaixo para adicionar:")
-                _to_add = st.multiselect("Adicionar à selecção", _search_matches,
-                                          key="now_search_add", label_visibility="collapsed")
+            _sm = sorted([n for n in _now_sku_opts if now_search.lower() in n.lower()])[:25]
+            if _sm:
+                st.caption(f"{len(_sm)} resultado(s) — clica para adicionar à selecção:")
+                _to_add = st.multiselect("", _sm, key="now_search_add", label_visibility="collapsed")
                 if _to_add:
-                    # Merge search additions into now_sku session
-                    _combined = list(set((now_sku or []) + _to_add))
+                    _combined = list(dict.fromkeys((now_sku or []) + _to_add))
                     st.session_state["now_sku"] = _combined
                     now_sku = _combined
+            else:
+                st.caption("Sem resultados.")
 
-    # ── Apply filters ─────────────────────────────────────────────────────────
-    _now_filtered = _now_full.copy()
-    if now_ret:    _now_filtered = _now_filtered[_now_filtered["Retalhista"].isin(now_ret)]
-    if now_marca:  _now_filtered = _now_filtered[_now_filtered[_marca_col].isin(now_marca)]
-    if now_fmt:    _now_filtered = _now_filtered[_now_filtered["Formato"].isin(now_fmt)]
-    if now_size:   _now_filtered = _now_filtered[_now_filtered["Quantidade"].astype(str).isin(now_size)]
-    if now_sku:    _now_filtered = _now_filtered[_now_filtered["Nome"].isin(now_sku)]
-    if now_search and not now_sku:
-        _now_filtered = _now_filtered[_now_filtered["Nome"].str.contains(now_search, case=False, na=False)]
+    # ── Apply all filters ─────────────────────────────────────────────────────
+    _nf = _now_full.copy()
+    if now_ret:    _nf = _nf[_nf["Retalhista"].isin(now_ret)]
+    if now_marca:  _nf = _nf[_nf[_now_marca_col].isin(now_marca)]
+    if now_fmt and "Formato" in _nf.columns:
+                   _nf = _nf[_nf["Formato"].isin(now_fmt)]
+    if now_size:   _nf = _nf[_nf["Quantidade"].astype(str).isin(now_size)]
+    if now_sku:    _nf = _nf[_nf["Nome"].isin(now_sku)]
+    elif now_search:
+                   _nf = _nf[_nf["Nome"].str.contains(now_search, case=False, na=False)]
 
     with right_tbl:
-        st.markdown(f"**{_now_filtered['Nome'].nunique()} SKU(s)** encontrado(s) · "
-                    f"**{len(_now_filtered)}** combinações produto × retalhista")
+        n_skus_now = _nf["Nome"].nunique()
+        st.markdown(f"**{n_skus_now} SKU(s)** encontrado(s)")
 
-        if _now_filtered.empty:
+        if _nf.empty:
             st.info("Sem SKUs com os filtros seleccionados.")
         else:
-            # ── Pivot: one row per SKU, columns per retailer ───────────────────
-            # Build wide table: SKU info + for each retailer: Preço Atual, Min 30d, Max 30d
-            _pivot_rows = []
-            _sku_groups = _now_filtered.groupby("Nome")
+            # ── Build HTML table with hover tooltips (Mín/Máx 30d on hover) ───
+            # Colors per retailer
+            RC = RETAILER_COLORS  # {"Continente":"#2563eb","Auchan":"#7c3aed","PingoDoce":"#db2777"}
 
-            for nome, grp in _sku_groups:
-                marca_v = grp[_marca_col].iloc[0] if _marca_col in grp.columns else grp["Marca"].iloc[0]
-                qtd_v   = str(grp["Quantidade"].iloc[0]) if pd.notna(grp["Quantidade"].iloc[0]) else "—"
-                fmt_v   = str(grp["Formato"].iloc[0]) if ("Formato" in grp.columns and pd.notna(grp["Formato"].iloc[0])) else "—"
-                row_d   = {"Nome": nome, "Marca": marca_v, "Formato": fmt_v, "Qtd": qtd_v}
+            # Pivot: one row per SKU nome
+            _pivot_rows = []
+            for nome, grp in _nf.sort_values("Nome").groupby("Nome", sort=False):
+                mp_v  = str(grp[_now_marca_col].iloc[0]) if pd.notna(grp[_now_marca_col].iloc[0]) else "—"
+                fmt_v = str(grp["Formato"].iloc[0]) if ("Formato" in grp.columns and pd.notna(grp["Formato"].iloc[0])) else "—"
+                qtd_v = str(grp["Quantidade"].iloc[0]) if pd.notna(grp["Quantidade"].iloc[0]) else "—"
+                row_d = {"Nome": nome, "Marca": mp_v, "Formato": fmt_v, "Qtd": qtd_v}
                 for ret_v in RETAILER_ORDER:
-                    sub_r = grp[grp["Retalhista"]==ret_v]
+                    sub_r = grp[grp["Retalhista"] == ret_v]
                     if sub_r.empty:
-                        row_d[f"{ret_v} €"]    = "—"
-                        row_d[f"{ret_v} Min"]  = "—"
-                        row_d[f"{ret_v} Máx"]  = "—"
+                        row_d[ret_v] = None
                     else:
                         r = sub_r.iloc[0]
-                        row_d[f"{ret_v} €"]   = f"{r['Preco_Atual']:.2f}"
-                        row_d[f"{ret_v} Min"]  = f"{r['Min_30d']:.2f}" if pd.notna(r.get('Min_30d')) else "—"
-                        row_d[f"{ret_v} Máx"]  = f"{r['Max_30d']:.2f}" if pd.notna(r.get('Max_30d')) else "—"
+                        row_d[ret_v] = {
+                            "atual": r["Preco_Atual"],
+                            "min":   r["Min_30d"] if pd.notna(r.get("Min_30d")) else None,
+                            "max":   r["Max_30d"] if pd.notna(r.get("Max_30d")) else None,
+                            "data":  r["Data_Leitura"].strftime("%d/%m/%Y") if pd.notna(r.get("Data_Leitura")) else "—",
+                        }
                 _pivot_rows.append(row_d)
 
-            df_pivot = pd.DataFrame(_pivot_rows).sort_values(["Marca","Nome"])
-
-            # Style: highlight current price cells
-            def style_now(df_s):
-                styles = pd.DataFrame("", index=df_s.index, columns=df_s.columns)
+            # Build HTML table
+            ret_headers = "".join(
+                f'<th style="background:{RC[r]}18;color:{RC[r]};min-width:90px;text-align:center;padding:6px 10px;">{r}</th>'
+                for r in RETAILER_ORDER
+            )
+            html_rows = ""
+            for rd in _pivot_rows:
+                cells = ""
                 for ret_v in RETAILER_ORDER:
-                    col_now = f"{ret_v} €"
-                    if col_now in df_s.columns:
-                        color = RETAILER_COLORS.get(ret_v, "#333")
-                        for i in df_s.index:
-                            if df_s.loc[i, col_now] != "—":
-                                styles.loc[i, col_now] = (
-                                    f"background-color:{color}18;"
-                                    f"color:{color};"
-                                    "font-weight:700;"
-                                )
-                return styles
+                    v = rd[ret_v]
+                    color = RC.get(ret_v, "#333")
+                    if v is None:
+                        cells += f'<td style="text-align:center;color:#ccc;padding:5px 10px;">—</td>'
+                    else:
+                        preco_str = f"{v['atual']:.2f} €"
+                        mn = f"{v['min']:.2f} €" if v["min"] is not None else "—"
+                        mx = f"{v['max']:.2f} €" if v["max"] is not None else "—"
+                        tooltip = f"Última leitura: {v['data']}&#10;Mín 30d: {mn}&#10;Máx 30d: {mx}"
+                        cells += (
+                            f'<td style="text-align:center;padding:5px 10px;" title="{tooltip}">' +
+                            f'<span style="background:{color}15;color:{color};font-weight:700;' +
+                            f'padding:3px 10px;border-radius:5px;cursor:help;font-size:.88rem;">' +
+                            f'{preco_str}</span></td>'
+                        )
+                html_rows += (
+                    f'<tr style="border-bottom:1px solid #f1f5f9;">' +
+                    f'<td style="padding:5px 10px;font-size:.82rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{rd["Nome"]}">{rd["Nome"]}</td>' +
+                    f'<td style="padding:5px 10px;font-size:.78rem;color:#666;">{rd["Marca"]}</td>' +
+                    f'<td style="padding:5px 10px;font-size:.78rem;color:#888;">{rd["Formato"]}</td>' +
+                    f'<td style="padding:5px 10px;font-size:.78rem;color:#888;">{rd["Qtd"]}</td>' +
+                    cells +
+                    "</tr>"
+                )
 
-            st.dataframe(
-                df_pivot.style.apply(style_now, axis=None),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Nome":  st.column_config.TextColumn("Nome", width="large"),
-                    "Marca": st.column_config.TextColumn("Marca", width="medium"),
-                    **{f"{r} €":   st.column_config.TextColumn(f"{r} Atual €", width="small")  for r in RETAILER_ORDER},
-                    **{f"{r} Min": st.column_config.TextColumn(f"{r} Mín 30d", width="small")  for r in RETAILER_ORDER},
-                    **{f"{r} Máx": st.column_config.TextColumn(f"{r} Máx 30d", width="small")  for r in RETAILER_ORDER},
-                },
-            )
-
-            # ── Last read date info ────────────────────────────────────────────
-            st.caption(
-                f"Preço Atual = última leitura disponível. "
-                f"Mín/Máx = intervalo dos últimos 30 dias (desde {_cutoff_30.strftime('%d/%m/%Y')})."
-            )
+            table_html = f"""
+<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb;">
+<table style="width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;font-size:.83rem;">
+<thead>
+<tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;">
+  <th style="text-align:left;padding:7px 10px;min-width:200px;">Nome</th>
+  <th style="text-align:left;padding:7px 10px;">Marca</th>
+  <th style="text-align:left;padding:7px 10px;">Formato</th>
+  <th style="text-align:left;padding:7px 10px;">Qtd</th>
+  {ret_headers}
+</tr>
+</thead>
+<tbody>
+{html_rows}
+</tbody>
+</table>
+</div>
+<p style="font-size:.72rem;color:#aaa;margin-top:.4rem;">
+  💡 Passe o cursor sobre um preço para ver Mín/Máx dos últimos 30 dias e data da última leitura.
+  Mín/Máx calculados desde {_cutoff_30.strftime('%d/%m/%Y')}.
+</p>
+"""
+            st.markdown(table_html, unsafe_allow_html=True)
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
