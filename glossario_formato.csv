@@ -1,0 +1,822 @@
+PID,Retalhista,Nome,Marca,Quantidade,Formato
+2211953,Continente,Tarte Gelada Baunilha Viennetta,Viennetta,emb. 650 ml,Cakes
+2844079,Continente,Tarte Gelada de Chocolate Viennetta,Viennetta,emb. 650 ml,Cakes
+4020304,Continente,Gelado Chocolate de Menta Les Authentiques Carte DOr,Carte DOr,emb. 1 lt,Tubs
+4704539,Continente,Gelado Perna de Pau Olá,Olá,emb. 420 ml (6 un),Sticks
+4712309,Continente,Gelado Super Maxi Olá,Olá,emb. 390 ml (6 un),Sticks
+4886486,Continente,Gelado Super Mix Calippo,Calippo,emb. 525 ml (5 un),Pots
+5045043,Continente,Gelado Fizz Limão Olá,Olá,emb. 330 ml (6 un),Sticks
+5323151,Continente,Gelado Nata sem Lactose Nutrégi,Nutrégi,emb. 500 ml,Pints
+5553145,Continente,Gelado Morango Calippo,Calippo,emb. 525 ml (5 un),Pots
+5562119,Continente,Tarte Gelada Morango Continente,Continente,emb. 1 lt,Cakes
+5564190,Continente,Gelado Cone Morango 6 unidades Cornetto,Cornetto,emb. 540 ml (6 un),Cones
+5608351,Continente,Tarte Gelada Baunilha e Chocolate Continente,Continente,emb. 1 lt,Cakes
+5965614,Continente,Açaí Orgânico com Guaraná Native Açaí,Native Açaí,emb. 160 ml,Pints
+6089406,Continente,Gelado Baunilha e Amêndoa Magnum,Magnum,emb. 440 ml,Pints
+6393009,Continente,Açaí Orgânico com Stevia Native Açaí,Native Açaí,emb. 160 ml,Pints
+6470103,Continente,Gelado Mini Cone Clássico Cornetto,Cornetto,emb. 480 ml (6 un + 2 un GRÁTIS),Cones
+6494390,Continente,Gelado Mini Chocolate Negro Magnum,Magnum,emb. 330 ml (6 un),Sticks
+6582990,Continente,Soja Sandwich Vegan,Valsoia,emb. 320 gr,Sandwich
+6588803,Continente,Gelado Manteiga de Amendoim Crunch Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6592516,Continente,Sorbet Limão sem Lactose Continente,Continente,emb. 1 lt,Tubs
+6592674,Continente,Gelado Mini Sandwich Continente,Continente,emb. 510 ml (6 un),Sandwich
+6703121,Continente,Açaí Orgânico com Banana Native Açaí,Native Açaí,emb. 160 ml,Pints
+6787595,Continente,Gelado Doce de Leite Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787602,Continente,Gelado Pralines & Cream Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787631,Continente,Gelado Manga e Framboesa Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787649,Continente,Gelado Cookies & Cream Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787662,Continente,Gelado Cheesecake Morango Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787709,Continente,Gelado Macadâmia Nut Brittle Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787710,Continente,Gelado Baunilha Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787743,Continente,Gelado Strawberries & Cream Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787746,Continente,Gelado Belgian Chocolate Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787748,Continente,Gelado Caramelo Salgado Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787749,Continente,Gelado Speculoos Caramel Biscuit & Cream Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+6787772,Continente,Gelado Caramelo Collection Minicups Häagen-Dazs,Häagen-Dazs,emb. 380 ml (4 un),Pints
+6787775,Continente,Gelado Fruit Collection Minicups Häagen-Dazs,Häagen-Dazs,emb. 380 ml (4 un),Pints
+6845206,Continente,Gelado Chocolate Branco e Cookies Magnum,Magnum,emb. 440 ml,Pints
+6846661,Continente,Gelado Mini Chocolate Branco e Cookies Magnum,Magnum,emb. 330 ml (6 un),Sticks
+6851067,Continente,Gelado Amêndoa Vegan Magnum,Magnum,emb. 270 ml (3 un),Sticks
+6923800,Continente,Gelado Icónico Morango Continente,Continente,emb. 720 ml (6 un),Cones
+6923826,Continente,Gelado Classicone Baunilha Continente,Continente,emb. 660 ml (6 un),Cones
+6923901,Continente,Gelado Icónico Chocolate Continente,Continente,emb. 720 ml (6 un),Cones
+6924270,Continente,Açaí Orgânico Sambazon,Sambazon,emb. 500 ml,Pints
+6948998,Continente,Gelado Morango Continente,Continente,emb. 1 lt,Tubs
+6949002,Continente,Gelado Baunilha Continente,Continente,emb. 1 lt,Tubs
+6949004,Continente,Gelado Chocolate Continente,Continente,emb. 1 lt,Tubs
+6949006,Continente,Gelado Nata Continente,Continente,emb. 1 lt,Tubs
+7018487,Continente,Gelado Baunilha e Morango Continente,Continente,emb. 2 lt,Tubs
+7018489,Continente,Gelado Baunilha e Chocolate Continente,Continente,emb. 2 lt,Tubs
+7095205,Continente,Gelado Chocolate Fudge Brownie Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7105463,Continente,Gelado Peanut Butter Cup Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7105465,Continente,Caramelo Chew Chew,,,Pints
+7105624,Continente,Gelado Caramelo Brownie Party Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7105632,Continente,Gelado Cheesecake Morango Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7109616,Continente,Gelado Cookie Dough Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7141071,Continente,Gelado Feast Olá,Olá,emb. 360 ml (4 un),Sticks
+7164297,Continente,Classicone Caramelo Salgado,,,Cones
+7164607,Continente,Gelado Frutipop Continente,Continente,emb. 368 ml (8 un),Sticks
+7184412,Continente,Manga 100% Fruta,,,Other
+7224301,Continente,Gelado de Caramelo e Biscoito Twix,Twix,emb. 204 gr (6 un),Bars
+7335491,Continente,Gelado Double Gold Caramelo Billionaire Magnum,Magnum,emb. 440 ml,Pints
+7371928,Continente,Gelado Cone Clássico Cornetto,Cornetto,emb. 540 ml (6 un),Cones
+7371929,Continente,Gelado Cone Chocolate Cornetto,Cornetto,emb. 540 ml (6 un),Cones
+7371936,Continente,Gelado Mini Double Gold Caramelo Billionaire Magnum,Magnum,emb. 330 ml (6 un),Sticks
+7390517,Continente,Gelado Baunilha e Chocolate Carte DOr,Carte DOr,"emb. 1,7 lt",Tubs
+7390518,Continente,Gelado Baunilha & Morango Carte DOr,Carte DOr,"emb. 1,7 lt",Tubs
+7409924,Continente,Magnífico Chocolate Branco com Amêndoa,,,Sticks
+7411087,Continente,"Gelado Café, Chocolate Branco e Caramelo Continente",Continente,emb. 950 ml,Tubs
+7411089,Continente,Gelado Banana Split Continente,Continente,emb. 950 ml,Tubs
+7411090,Continente,Gelado Baunilha e Noz Pecan Continente,Continente,emb. 950 ml,Tubs
+7411092,Continente,Gelado Limão e Merengue Continente,Continente,emb. 950 ml,Tubs
+7411520,Continente,Gelado Chocolate e Avelã Continente,Continente,emb. 950 ml,Tubs
+7418308,Continente,Raffaello,,,Sticks
+7418321,Continente,Chocolate e Avelã,,,Sticks
+7430573,Continente,Gelado Mini Magníficos Sortido de Clássicos Continente,Continente,emb. 600 ml (12 un),Sticks
+7456964,Continente,Gelado Menta Continente,Continente,emb. 950 ml,Tubs
+7521862,Continente,Gelado Cola Calippo,Calippo,emb. 105 ml (5 un),Pots
+7558971,Continente,Gelado Exotic Solero,Solero,emb. 270 ml (3 un),Sticks
+7584154,Continente,Morango 100% Fruta,,,
+7584214,Continente,Gelado Fresh Limão e Morango Continente,Continente,emb. 6 un,Pots
+7613772,Continente,O Gelado Tarte Amêndoa,O Gelado,emb. 490 ml,Pints
+7613915,Continente,Gelado Joys Collection Minicups Häagen-Dazs,Häagen-Dazs,emb. 380 ml (4 un),Pints
+7616133,Continente,O Gelado Maracujá Vegan,O Gelado,emb. 460 ml,Pints
+7616142,Continente,O Gelado Morango Vegan,O Gelado,emb. 460 ml,Pints
+7622287,Continente,Gelado Mini Magníficos Amêndoa Continente,Continente,emb. 456 gr (12 un),Sticks
+7622307,Continente,Gelado Caramelo com cobertura chocolate Mars,Mars,emb. 240 gr (6 un),Bars
+7622308,Continente,Gelado Caramelo e Manteiga de Amendoim com cobertura Chocolate Snickers,Snickers,emb. 270 gr (6 un),Bars
+7628015,Continente,Gelado Classic Cone Kinder,Kinder,emb. 248 gr (4 un),Sticks
+7724698,Continente,Gelado Dulce Delish Sundae Ben & Jerrys,Ben & Jerrys,emb. 427 ml,Pints
+7725508,Continente,Sorbet Framboesa Continente Seleção,Continente Seleção,emb. 450 ml,Pints
+7725520,Continente,Gelado Ovos Moles Continente Seleção,Continente Seleção,emb. 450 ml,Pints
+7730113,Continente,Gelado Mix Kids Olá,Olá,emb. 398 ml (8 un),Sticks
+7734499,Continente,Sorbet Manga sem Lactose Continente,Continente,emb. 1 lt,Tubs
+7736746,Continente,Gelado Mochi Maracujá Continente,Continente,emb. 6 un,Bites
+7753717,Continente,Gelado Cookie & Dough Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+7753798,Continente,Macaron Double Chocolate,,,Bites
+7753799,Continente,Macaron Morango e Framboesa,,,Bites
+7754866,Continente, Mini Double Caramelo e Gold Caramelo Billionaire,,,Sticks
+7754874,Continente,Gelado Double Gold Caramel Billionaire Magnum,Magnum,emb. 255 ml (3 un),Sticks
+7754882,Continente,Cone Chocolate Branco Filipinos,,,Cones
+7754883,Continente,Gelado Sandwich XXL Filipinos Olá,Olá,emb. 520 ml (4 un),Sandwich
+7754925,Continente,Gelado Classic Cone Chocolate Branco Kinder,Kinder,emb. 248 gr (4 un),Sticks
+7756099,Continente,Gelado Mini Magníficos Amêndoa e Chocolate Branco Continente,Continente,emb. 12 un,Sticks
+7756158,Continente,Tarte Gelada Caramelo Salgado Viennetta,Viennetta,emb. 650 ml,Cakes
+7756439,Continente,Iogurte e Framboesa,,,
+7756441,Continente,Gelado Iogurte Continente,Continente,emb. 500 ml,Pints
+7757016,Continente,Gelado Chocolate sem Lactose Nutrégi,Nutrégi,emb. 500 ml,Pints
+7757019,Continente,Gelado Morango sem Lactose Nutrégi,Nutrégi,emb. 500 ml,Pints
+7757069,Continente,Avelã Torrada Vegan sem Glúten,,,
+7759362,Continente,Gelado Double Chocolate Vegan sem Glúten Pink Albatross,Pink Albatross,emb. 480 ml,Pints
+7759363,Continente,Gelado Exotic Maracujá Vegan sem Glúten Pink Albatross,Pink Albatross,emb. 480 ml,Pints
+7759364,Continente,Gelado Tropical Manga Vegan sem Glúten Pink Albatross,Pink Albatross,emb. 480 ml,Pints
+7759365,Continente,Gelado Pistácio Vegan sem Glúten Pink Albatross,Pink Albatross,emb. 480 ml,Pints
+7759366,Continente,Gelado Straccia-Coco Vegan sem Glúten Pink Albatross,Pink Albatross,emb. 480 ml,Pints
+7760701,Continente,,,,
+7760703,Continente,Classicone Marshmallow,,,Cones
+7760704,Continente,,,,
+7760705,Continente,IceFest Mix,,,Sticks
+7778850,Continente,Gelado Mini Double Framboesa Magnum,Magnum,emb. 330 ml (6 un),Sticks
+7781535,Continente,Gelado Chocolate Brownie Continente,Continente,emb. 950 ml,Tubs
+7781536,Continente,Gelado Tiramisu Continente,Continente,emb. 950 ml,Tubs
+7781552,Continente,O Gelado Lima Vegan,O Gelado,emb. 460 ml,Pints
+7783272,Continente,Gelado Mini Double Caramelo Magnum,Magnum,emb. 330 ml (6 un),Sticks
+7785012,Continente,Gelado Brownie Caramelo Chunks Oh My Moo,Oh My Moo,emb. 500 ml,Pints
+7800880,Continente,,,,
+7800885,Continente,,,,
+7848173,Continente,Açaí com Guaraná Biológico Continente Bio,Continente Bio,emb. 500 ml,Tubs
+7889479,Continente,Gelado Mochi Coco sem Glúten Little Moons,Little Moons,emb. 6 un,Bites
+7893268,Continente,Gelado Mochi Maracujá e Manga Vegan Little Moons,Little Moons,emb. 6 un,Bites
+7893272,Continente,Gelado Mochi Pistáchio Torrado com Mel sem Glúten Little Moons,Little Moons,emb. 6 un,Bites
+7931544,Continente,Gelado Baunilha e Brownie de Caramelo Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+7944223,Continente,Gelado Iogurte e Frutos Vermelhos Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+7947223,Continente,Gelado Stracciatella Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+7947224,Continente,Gelado Tiramisu Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+7947225,Continente,Gelado Chocolate Brownie Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+7947226,Continente,Cookies & Cream Les Desserts,,,
+7947230,Continente,Gelado Caramelo Salgado Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+7947232,Continente,Gelado Karamel Sutra Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7947233,Continente,Gelado Half Baked Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7947237,Continente,Gelado Marshmallow & Smore Sundae Ben & Jerrys,Ben & Jerrys,emb. 427 ml,Pints
+7947238,Continente,Gelado Mini Pink Lemonade Magnum,Magnum,emb. 330 ml (6 un),Sticks
+7947249,Continente,"Gelado Wonder Toffee, Chocolate e Amêndoas Caramelizadas Magnum",Magnum,emb. 270 ml (3 un),Sticks
+7974309,Continente,Gelado Mini Chocolate e Amêndoa Magnum,Magnum,emb. 330 ml (6 un),Sticks
+7975641,Continente,Gelado Menta Magnum,Magnum,emb. 300 ml (3 un),Sticks
+7975649,Continente,"Gelado Chocolate Clássico, Amêndoa e Chocolate Branco Magnum",Magnum,emb. 720 ml (8 un),Sticks
+7975650,Continente,Gelado Chocolate Branco e Morango Magnum,Magnum,emb. 400 ml (4 un),Sticks
+7975651,Continente,Bomboniera,,,Bites
+7975652,Continente,Gelado Chocolate Clássico Magnum,Magnum,emb. 440 ml,Pints
+7975654,Continente,Pistácio,,,
+7975656,Continente,"Gelado Mini Chocolate Clássico, Amêndoa e Chocolate Branco Magnum",Magnum,emb. 550 ml (10 un),Sticks
+7975657,Continente,Gelado Spectacu-Love Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+7975659,Continente,Disney Rei Leão,,,Sandwich
+7976847,Continente,Gelado Rol Olá,Olá,emb. 360 ml,Sticks
+7987774,Continente,Gelado Nutella,Nutella,emb. 470 ml,Pints
+7987798,Continente,Gelado Chocolate Kinder,Kinder,emb. 220 ml (4 un),Sticks
+8006722,Continente,Gelado Double Caramelo Salgado Magnum,Magnum,emb. 440 ml,Pints
+8007004,Continente,"Gelado Mini Chocolate Clássico, Amêndoa e Chocolate Branco Magnum",Magnum,emb. 330 ml (6 un),Sticks
+8007462,Continente,Filipinos,,,Sandwich
+8013078,Continente,Gelado Chocolate e Amêndoa Magnum,Magnum,emb. 400 ml (4 un),Sticks
+8013080,Continente,Gelado Morango e Merengue Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8020297,Continente,Gelado Tropical Fresh Continente,Continente,emb. 6 un,Sticks
+8020302,Continente,Gelado Lemon Freezy Continente,Continente,emb. 6 un,Sticks
+8020303,Continente,Gelados Coco Metades sem Glúten Continente,Continente,emb. 2 un,Pints
+8020337,Continente,Gelado Doce de Leite Continente,Continente,emb. 950 ml,Tubs
+8020339,Continente,Gelado Proteína Cappuccino Continente,Continente,emb. 500 ml,Pints
+8020344,Continente,Gelado Cone Brigadeiro Cornetto,Cornetto,emb. 480 ml (4 un),Cones
+8020412,Continente,Gelado Proteína Biscoito Continente,Continente,emb. 500 ml,Pints
+8020413,Continente,Gelado Proteína Caramelo Salgado Continente,Continente,emb. 500 ml,Pints
+8021790,Continente,Açaí Biológico Oakberry,Oakberry,emb. 473 ml,Pints
+8025068,Continente,Gelado After Dinner Magnum,Magnum,emb. 280 ml (8 un),Bites
+8025801,Continente,Gelado Café Häagen-Dazs,Häagen-Dazs,emb. 460 ml,Pints
+8028362,Continente,Gelado Belgian Chocolate Collection Minicups Häagen-Dazs,Häagen-Dazs,emb. 380 ml (4 un),Pints
+8033537,Continente,Gelado Morango e Framboesa Pink Albatross,Pink Albatross,emb. 260 ml (4 un),Sticks
+8033538,Continente,Manga e Maracujá,Pink Albatross,emb. 640 gr (4 un),Sticks
+8037362,Continente,Gelado de Chocolate com recheio de Coco Bounty,Bounty,emb. 300 ml (6 un),Bars
+8037364,Continente,Gelado Morango e Banana Danonino,Danonino,emb. 300 gr (6 un),Sticks
+8037736,Continente,Gelado Caramelo e Manteiga de Amendoim com cobertura Chocolate Branco Snickers,Snickers,emb. 264 ml (6 un),Bars
+8039787,Continente,Gelado Tarte de Limão Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8039792,Continente,Gelado Mini Double Caramelo e Chocolate Magnum,Magnum,emb. 330 ml (6 un),Sticks
+8039817,Continente,Gelado Baunilha Exótico Solero Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8041144,Continente,Açaí Orgânico com Guaraná e Stevia Native Açaí,Native Açaí,emb. 480 ml,Pints
+8066839,Continente,Gelado Caramel & Nuts Magnum,Magnum,emb. 256 ml (4 un),Bars
+8067121,Continente,Gelado Bombom Chocolate Branco e Cookies Magnum,Magnum,emb. 204 ml (12 un),Bites
+8067126,Continente,Gelado Bombom Double Gold Caramelo Billionaire Magnum,Magnum,emb. 204 ml (12 un),Bites
+8067127,Continente,Gelado Bombom Caramelo Salgado e Amêndoas Magnum,Magnum,emb. 204 ml (12 un),Bites
+8067138,Continente,Gelado Mini Double Chocolate Belga Pink Albatross,Pink Albatross,emb. 260 ml (4 un),Sticks
+8068467,Continente,Gelado Framboesa e Pistácio Vegan Swee,Swee,emb. 450 ml,Pints
+8083165,Continente,Gelado Frutos Exóticos Olá,Olá,emb. 900 ml,Tubs
+8083214,Continente,Gelado Caramelo Salgado Olá,Olá,emb. 900 ml,Tubs
+8083218,Continente,Gelado Bolacha e Chocolate Olá,Olá,emb. 900 ml,Tubs
+8083243,Continente,Gelado Baunilha Pecan Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8083311,Continente,Gelado Cookies com Cookie Dough Vegan sem Lactose Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+8083314,Continente,Gelado Chocolate Clássico Magnum,Magnum,emb. 300 ml (3 un),Sticks
+8090997,Continente,,,,
+8093286,Continente,Gelado Cookie Pepitas de Chocolate Valsoia,Valsoia,emb. 90 gr,Sandwich
+8109735,Continente,"Gelado Cone Soja, Chocolate e Avelã Valsoia",Valsoia,emb. 300 gr (4 un),Cones
+8113590,Continente,Gelado Mini Chocolate Branco e Amêndoa Magnum,Magnum,emb. 330 ml (6 un),Sticks
+8145416,Continente,Gelado Bombom Chocolate Negro e Caramelo Vegan Over the Moo,Over the Moo,emb. 60 gr,Bites
+8159795,Continente,Gelado Caramelo Continente,Continente,emb. 950 ml,Tubs
+8161472,Continente,Gelado Cheesecake Continente,Continente,emb. 950 ml,Tubs
+8161473,Continente,Gelado Stracciatella Continente,Continente,emb. 950 ml,Tubs
+8203177,Continente,Gelado Pistácio Häagen-Dazs,Häagen-Dazs,emb. 420 ml,Pints
+8239708,Continente,Gelado Utopia Double Avelã Magnum,Magnum,emb. 440 ml,Sticks
+8239709,Continente,Gelado Utopia Double Avelã Magnum,Magnum,emb. 255 ml (3 un),Sticks
+8239717,Continente,Gelado Utopia Double Cereja Magnum,Magnum,emb. 255 ml (3 un),Sticks
+8240346,Continente,Gelado Cone Baunilha Cornetto,Cornetto,emb. 360 ml (4 un),Cones
+8240591,Continente,Gelado Brookies & Cream Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+8240610,Continente,Gelado Bohemian Raspberry Vegan sem Lactose Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+8240635,Continente,Gelado Mini Chocolate Clássico Magnum,Magnum,emb. 330 ml (6 un),Sticks
+8243396,Continente,Gelado Mini Utopia Double Avelã Magnum,Magnum,emb. 330 ml (6 un),Sticks
+8391738,Continente,Gelado Chocolate e Cookies Häagen-Dazs,Häagen-Dazs,emb. 240 ml (3 un),Pints
+8391742,Continente,Gelado Tiramisu Häagen-Dazs,Häagen-Dazs,emb. 420 ml,Pints
+8391747,Continente,Chocolate Negro e Laranja,,,
+8391749,Continente,Gelado Caramelo Salgado Häagen-Dazs,Häagen-Dazs,emb. 240 ml (3 un),Pints
+8391751,Continente,Gelado Chocolate de Leite e Noz Macadâmia Häagen-Dazs,Häagen-Dazs,emb. 240 ml (3 un),Pints
+8391753,Continente,Doce de Leite e Canela,,,
+8393266,Continente,Gelado Manga e Red Velvet Vegan Swee,Swee,emb. 450 ml,Pints
+8393466,Continente,Raffaello Pêssego e Hibisco,,,
+8405656,Continente,Gelado Manga e Maracujá Continente,Continente,emb. 900 ml,Tubs
+8409900,Continente,Gelado Rainbow Continente,Continente,emb. 6 un,Sticks
+8409929,Continente,Gelado Baunilha e Morango Sprinkles Continente,Continente,emb. 6 un,Sticks
+8412780,Continente,Gelado Caramel Latte Craze Continente,Continente,emb. 500 ml,Pints
+8413814,Continente,Gelado Baunilha de Madagáscar Les Classiques Carte DOr,Carte DOr,"emb. 1,3 lt",Tubs
+8415334,Continente,Gelado Baunilha com Esteróis Vegetais Icecare,Icecare,emb. 500 ml,Pints
+8416471,Continente,Gelado Mini Magníficos Coco Continente,Continente,emb. 400 gr (8 un),Sticks
+8416472,Continente,Gelado Mini Magníficos Pistácio e Framboesa Continente,Continente,emb. 400 gr (8 un),Sticks
+8416473,Continente,Gelado Nuts for Cups Continente,Continente,emb. 500 ml,Pints
+8416508,Continente,Gelado Mini Magníficos Caramelo Continente,Continente,emb. 400 gr (8 un),Sticks
+8416518,Continente,Gelado Nutsy Caramelt Down Continente,Continente,emb. 500 ml,Pints
+8416519,Continente,Gelado Berry Cheesy love Continente,Continente,emb. 500 ml,Pints
+8416531,Continente,Gelado de Cone Speculoos La Menorquina,La Menorquina,emb. 4 un,Cones
+8416533,Continente,Morango e Merengue,,,
+8416534,Continente,Gelado Cone Perna de Pau Olá,Olá,emb. 360 ml (4 un),Cones
+8416535,Continente,Pêssego Melba,,,
+8416729,Continente,Gelado Sandwich Caramelo e Pipocas La Menorquina,La Menorquina,emb. 3 un,Sandwich
+8416798,Continente,Gelado Cola Super Homem La Menorquina,La Menorquina,emb. 3 un,Pots
+8416866,Continente,Gelado Nata e Morango Chupa Chups La Menorquina,La Menorquina,emb. 5 un,Sticks
+8416867,Continente,Chocolate e Cookies,,,
+8416874,Continente,Gelado Sandwich Filipinos Caramelo Olá,Olá,emb. 520 ml (4 un),Sandwich
+8416875,Continente,Gelado Pistácio Les Desserts Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8416876,Continente,Gelado After Dinner Chocolate Negro Magnum,Magnum,emb. 280 ml (8 un),Bites
+8416878,Continente,Gelado Mini Twister Ananás Olá,Olá,emb. 300 ml (6 un),Sticks
+8416879,Continente,Gelado Cone Manga e Baunilha Cornetto,Cornetto,emb. 360 ml (4 un),Cones
+8416881,Continente,Gelado Filipinos Olá,Olá,emb. 248 ml (4 un),Sticks
+8416882,Continente,Gelado Gold Caramelo Billionaire Magnum,Magnum,emb. 256 ml (4 un),Bars
+8420388,Continente,Gelado Mini Magnífico Chocolate Branco com Morango Continente,Continente,emb. 8 x 50 ml,Sticks
+8421579,Continente,Gelado Sandwich Cookie Wookie Continente,Continente,emb. 360 ml (4 un),Sandwich
+8421635,Continente,Gelado Mochi Caramelo com Recheio Caramelo Salgado Continente,Continente,emb. 6 un,Bites
+8421636,Continente,Gelado Mochi Avelã com Recheio Chocolate Continente,Continente,emb. 3 un,Bites
+8421637,Continente,Gelado Classicone Doce de Leite e Caramelo Continente,Continente,emb. 3 un,Cones
+8421647,Continente,Gelado Mochi Framboesa Continente,Continente,emb. 6 un,Bites
+8421652,Continente,Gelado Pistachoco Affair Continente,Continente,emb. 500 ml,Pints
+8423877,Continente,Framboesas Cobertas com Chocolate Branco e Chocolate Negro Franuí,Franuí,emb. 150 gr,Frozen Fruits
+8423878,Continente,Framboesas Cobertas com Chocolate Branco e Chocolate de Leite Franuí,Franuí,emb. 150 gr,Frozen Fruits
+8423935,Continente,Gelado Sandwich de Nata Continente,Continente,emb. 6 x 100 ml,Sandwich
+8425089,Continente,"Gelado Chocolate, Caramelo e Amendoim Snickers",Snickers,emb. 4 un,Bars
+8435756,Continente,Gelado Magnífico Chocolate e Amêndoa Continente,Continente,emb. 600 ml (6 un),Sticks
+8435757,Continente,Gelado Magnífico Chocolate Continente,Continente,emb. 600 ml (6 un),Sticks
+8456370,Continente,Gelado Dough My Goodness Continente,Continente,emb. 500 ml,Pints
+8456481,Continente,Gelado Chocolate Cornetto Soft Carte DOr,Carte DOr,emb. 825 ml,Tubs
+8457452,Continente,Gelado Bolo Chocolate e Brownie Vegan Swee,Swee,emb. 450 ml,Pints
+8457557,Continente,Gelado Chocolate 0% Açúcares Adicionados Continente,Continente,emb. 500 ml,Pints
+8457558,Continente,Gelado Baunilha sem Açúcar Continente,Continente,emb. 500 ml,Pints
+8457559,Continente,Gelado Morango e Chocolate Vegan Swee,Swee,emb. 450 ml,Pints
+8457583,Continente,Gelado Magnífico Chocolate Branco e Morango Continente,Continente,emb. 600 ml (6 un),Sticks
+8469993,Continente,Gelado Hella Nuts Continente,Continente,emb. 500 ml,Pints
+8484617,Continente,Gelado de Chocolate Brownielicious Continente,Continente,emb. 500 ml,Pints
+8501584,Continente,Geldo de Chocolate Branco Magnum,Magnum,emb. 3 x 100 ml,Sticks
+8503500,Continente,Gelado Cookie Dough e Brookies & Cream Ben & Jerrys,Ben & Jerrys,emb. 2 x 450 ml,Pints - PromoPack
+8503535,Continente,Gelado After Dinner Classic e Chocolate Negro Magnum,Magnum,emb. 3 x 280 ml,Bites - PromoPack
+8503563,Continente,Gelado Bombom Caramelo Salgado e Double Gold Caramelo Billionaire Magnum,Magnum,emb. 2 x 204 ml,Bites
+8507208,Continente,Sorbet Açaí Biológico Oakberry,Oakberry,"emb. 1,5 lt",Tubs
+8511755,Continente,Gelado Bombom Chocolate Over the Moo,Over the Moo,emb. 60 gr,Bites
+8512516,Continente,Tarte Gelada Tartíssima Caramelo Continente,Continente,emb. 1 lt,Cakes
+8514236,Continente,Tarte Gelada Romântica Carte DOr,Carte DOr,emb. 1 lt,Cakes
+8516745,Continente,O Gelado Chocolate do Dubai,O Gelado,emb. 460 ml,Pints
+8588867,Continente,Gelado de Chocolate Praline Continente,Continente,emb. 4 x 70 ml,Sticks
+8657640,Continente,O Gelado de Chocolate com Pedaços de Salame,O Gelado,emb. 460 ml,Pints
+8691816,Continente,Gelado Sweet Mango Memories Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+8750677,Continente,Gelado Sandwich Cookie Dough Ben & Jerrys,Ben & Jerrys,emb. 272 ml (4 un),Sandwich
+8750680,Continente,Gelado 3 Sabores Carte DOr,Carte DOr,"emb. 1,3 Lt",Tubs
+8750688,Continente,Gelado de Pistácio Magnum Mini,Magnum Mini,emb. 330 ml (6 un),Sticks
+8750691,Continente,Gelado Pint Pistácio Crackable Magnum,Magnum,emb. 440 ml,Pints
+8750697,Continente,Gelado de Morango Strawberry Twist Solero,Solero,emb. 3  un,Sticks
+8751076,Continente,Gelado Pêssego com Chocolate Magnum,Magnum,emb. 270 ml (3 un),Sticks
+8751077,Continente,Gelado Churrifically Churros-y Ben & Jerrys,Ben & Jerrys,emb. 427 ml,Pints
+8751079,Continente,Gelado Bombom Chocolate de Leite e Cereja Magnum,Magnum,emb. 204 ml (12 un),Bites
+8751284,Continente,Gelado Pistácio com Chocolate Magnum,Magnum,emb. 270 ml (3 un),Sticks
+8751330,Continente,Gelado Cone Pistáchio Max Cornetto,Cornetto,emb. 360 ml (4 un),Cones
+8753635,Continente,Gelado Mochi Café Latte Vegan Little Moons,Little Moons,emb. 6 un,Bites
+8753636,Continente,Gelado Mochi Caramelo Vegan Little Moons,Little Moons,emb. 6 un,Bites
+8753637,Continente,Gelado Magnífico Chocolate Branco com Amêndoa Continente,Continente,emb. 600 gr (6 un),Sticks
+8795874,Continente,Gelado Roasted Almond Häagen-Dazs,Häagen-Dazs,emb. 240 ml (3 un),Pints
+8795885,Continente,Gelado Chocolate Brownie Häagen-Dazs,Häagen-Dazs,emb. 420 ml,Pints
+8798840,Continente,Tarte Gelada Cappuccino XXL Viennetta,Viennetta,emb. 1 lt,Cakes
+8822846,Continente,Gelado Cone Limão Cornetto,Cornetto,emb. 540 ml (6 un),Cones
+8822847,Continente,Gelado Mini Exotic e Berry Bliss Solero,Solero,emb. 300 ml (6 un),Sticks
+8822890,Continente,Gelado Feast Caramelo Olá,Olá,emb. 360 ml (4 un),Sticks
+8822976,Continente,Gelado Chunky Monkey Bem & Jerrys Ben & Jerrys,Ben & Jerrys,emb. 465 ml,Pints
+8822985,Continente,Gelado Haribo Push Up Olá,Olá,emb. 340 ml (4 un),Sticks
+8823034,Continente,Gelado Caramelo Salgado Magum,Magnum,emb. 300 ml (3 un),Sticks
+8823358,Continente,Gelado Chocolate com Amêndoas Magnum,Magnum,emb. 800 ml (8 un),Sticks
+8834723,Continente,Gelado Creamy Manteiga de Amendoim Snickers,Snickers,emb. 234 ml (6 un),Bars
+8853179,Continente,Gelado Manteiga de Amendoim e Chocolate de Leite Reeses,Reeses,emb. 460 ml,Pints
+8853254,Continente,Gelado Manteiga de Amendoim e Chocolate de Leite Reeses,Reeses,emb. 240 ml (3 un),Sticks
+8859249,Continente,Framboesas Cobertas com Chocolate de Leite Swee,Swee,emb. 140 gr,Bites
+1032202,Auchan,GELADO OLÁ MULTIPACK PERNA DE PAU 420ML,OLÁ,420ML,Sticks
+1033032,Auchan,GELADO OLÁ MULTIPACK CALIPPO MORANGO 525ML,OLÁ,525ML,Pots
+1035309,Auchan,GELADO OLÁ MULTIPACK KIDS SUPER MAXI 390ML,OLÁ,390ML,Sticks
+1044460,Auchan,SORBET AUCHAN TANGERINA 1L,AUCHAN,Quantidade não disponível,Tubs
+1054988,Auchan,TARTE GELADA AUCHAN NATA COM COBERTURA CHOCOLATE 1L,AUCHAN,Quantidade não disponível,Tubs
+1088131,Auchan,GELADO OLÁ MULTIPACK CALIPPO SUPERMIX 525ML,OLÁ,525ML,Pots
+1096657,Auchan,GELADO AUCHAN MENTA E CHOCOLATE PRETO 1L,AUCHAN,Quantidade não disponível,Tubs
+1110594,Auchan,GELADO HÄAGEN-DAZS CARAMEL ATTRACTION 4X95ML,HÄAGEN-DAZS,95ML,Cups
+1146231,Auchan,GELADO OLÁ FIZZ LIMÃO 6X60ML,OLÁ,60ML,Sticks
+1152235,Auchan,GELADO NUTRÉGI SEM LACTOSE NATA 500ML,NUTRÉGI,500ML,Pints
+2110919,Auchan,GELADO HÄAGEN-DAZS MANGA E FRAMBOESA 460ML,HÄAGEN-DAZS,460ML,Pints
+2111244,Auchan,Gelado Globo Multipack Yummy 6un,,,Sticks
+2152988,Auchan,GELADO MAGNUM MULTIPACK MINI WHITE MIX 6X55ML,MAGNUM,55ML,Sticks
+2163666,Auchan,GELADO HÄAGEN-DAZS SALTED CARAMEL 460ML,HÄAGEN-DAZS,460ML,Pints
+2171340,Auchan,GELADO CORNETTO MULTIPACK MORANGO 6X90ML,CORNETTO,90ML,Cones
+2171344,Auchan,GELADO CORNETTO MULTIPACK CLÁSSICO 6X90ML,CORNETTO,90ML,Cones
+2241172,Auchan,GELADO AUCHAN CONE NATA 6X120ML,AUCHAN,120ML,Cones
+2241768,Auchan,GELADO AUCHAN CONE MENTA CHOCOLATE 6X120ML,AUCHAN,120ML,Cones
+2241775,Auchan,GELADO AUCHAN RUM COM PASSAS DE UVA 1L,AUCHAN,Quantidade não disponível,Tubs
+2366250,Auchan,GELADO AUCHAN TRONCO 3 CHOCOLATES 1L,AUCHAN,Quantidade não disponível,Tubs
+2378770,Auchan,GELADO AUCHAN DOCE DE LEITE 900ML,AUCHAN,900ML,Tubs
+244658,Auchan,GELADO HÄAGEN-DAZS DOCE DE LEITE 460ML,HÄAGEN-DAZS,460ML,Pints
+2461047,Auchan,GELADO MAGNUM PINT AMÊNDOAS 440ML,MAGNUM,440ML,Pints
+2461049,Auchan,GELADO MAGNUM MULTIPACK MINI DOUBLE FRAMBOESA 6X60ML,MAGNUM,60ML,Sticks
+2461056,Auchan,GELADO MAGNUM PINT CLÁSSICO 440ML,MAGNUM,440ML,Pints
+2695804,Auchan,GELADO MAGNUM MULTIPACK MINI DOUBLE CARAMELO 6X60ML,MAGNUM,60ML,Sticks
+2695898,Auchan,GELADO CORNETTO MULTIPACK MINI CLÁSSICO 8X60ML,CORNETTO,60ML,Cones
+2733370,Auchan,GELADO HÄAGEN-DAZS PEANUT BUTTER CRUNCH 460ML,HÄAGEN-DAZS,460ML,Pints
+2736006,Auchan,GELADO NUTRÉGI SEM AÇÚCAR ADICIONADO BAUNILHA 500ML,NUTRÉGI,500ML,Pints
+2736013,Auchan,GELADO NUTRÉGI SEM AÇÚCAR ADICIONADO CHOCOLATE 500ML,NUTRÉGI,500ML,Pints
+2736017,Auchan,GELADO NUTRÉGI SEM AÇÚCAR ADICIONADO MORANGO 500ML,NUTRÉGI,500ML,Pints
+2739583,Auchan,GELADO O GELADO AMÊNDOA E CARAMELO SALGADO 460ML,O GELADO,460ML,Pints
+2979081,Auchan,GELADO VEGAN MAGNUM AMÊNDOAS 3X90ML,MAGNUM,90ML,Sticks
+2979088,Auchan,Gelado Magnum Pint White Chocolate E Cookies 440ml,,,Pints
+2979091,Auchan,GELADOMAGNUM PINT DOUBLE SALTED CARAMEL 440ML,MAGNUM,440ML,Pints
+3069806,Auchan,GELADO AUCHAN DE TORRÃO 900ML,AUCHAN,900ML,Tubs
+3084174,Auchan,GELADO DE MARCHI AÇAÍ BITES 100G,DE MARCHI,100G,Bites
+3152865,Auchan,GELADO B&J CHOCO FUDGE BROWNIE 465ML,BEN & JERRY'S,465ML,Pints
+3152890,Auchan,GELADO B&J PEANUT BUTTER CUP 465ML,BEN & JERRY'S,465ML,Pints
+3155938,Auchan,GELADO B&J STRAWBERRY CHEESECAKE 465ML,BEN & JERRY'S,465ML,Pints
+3155942,Auchan,GELADO B&J CARAMEL BROWNIE PARTY 465ML,BEN & JERRY'S,465ML,Pints
+3155973,Auchan,GELADO B&J COOKIE DOUGH 465ML,BEN & JERRY'S,465ML,Pints
+3170552,Auchan,GELADO OLÁ FEAST 4X90ML,OLÁ,90ML,Sticks
+3170565,Auchan,GELADO B&J COOKIE DOUGH VEGAN 465ML,BEN & JERRY'S,465ML,Pints
+3210521,Auchan,GELADO NUTRÉGI SEM AÇÚCAR ADICIONADO TIRAMISU 500ML,NUTRÉGI,500ML,Pints
+3290415,Auchan,GELADO PINT MAGNUM DOUBLE GOLD CARAMEL 440ML,MAGNUM,440ML,Pints
+3306279,Auchan,GELADO CORNETTO CHOCOLATE 6X90ML,CORNETTO,90ML,Cones
+3306529,Auchan,GELADO MAGNUM MINI DOUBLE BILLIONAIRE 6X55ML,MAGNUM,55ML,Sticks
+3328941,Auchan,GELADO CARTE D'OR BAUNILHA E CHOCOLATE 1.7L,CARTE D'OR,Quantidade não disponível,Tubs
+3328942,Auchan,GELADO CARTE D'OR BAUNILHA MORANGO 1.7L,CARTE D'OR,Quantidade não disponível,Tubs
+3328943,Auchan,GELADO MAGNUM MINI 3 CHOCOLATES 10X55ML,MAGNUM,55ML,Sticks
+3352054,Auchan,GELADO SNICKERS 6X48G,SNICKERS,48G,Bars
+3355728,Auchan,GELADO VEGAN O GELADO MORANGO 460ML,O GELADO,460ML,Pints
+3355734,Auchan,GELADO VEGAN O GELADO MARACUJÁ 460ML,O GELADO,460ML,Pints
+3356733,Auchan,GELADO MARS 6X41.8G,MARS,8G,Bars
+3356735,Auchan,GELADO TWIX 6X34.2G,TWIX,2G,Bars
+3357541,Auchan,GELADO AUCHAN CARAMELO COM PEDAÇOS CARAMELO 1L,AUCHAN,Quantidade não disponível,Tubs
+3361477,Auchan,,,,
+3363522,Auchan,GELADO HAPPY MRS JERSEY CHEESE CAKE FRAMBOESA BIO 500ML,HAPPY MRS JERSEY,500ML,Pints
+3363642,Auchan,GELADO HAPPY MRS JERSEY CARAMELO SALGADO BIO 500ML,HAPPY MRS JERSEY,500ML,Pints
+3363660,Auchan,GELADO THE ICELY BROTHERS VEGAN BROWNIE BIO 460ML,THE ICELY BROTHERS,460ML,Pints
+3446998,Auchan,Magnum Pistachio 3x100ml,,,Sticks
+3459478,Auchan,GELADO SOLERO EXOTICO 3X90ML,SOLERO,90ML,Sticks
+3459482,Auchan,Magnum Mini Cookie Mix 6x55 Ml,,,Sticks
+3466370,Auchan,GELADO MULTIPACK OLÁ CALIPPO COLA 525ML,OLÁ,525ML,Pots
+3474182,Auchan,GELADO HÄAGEN-DAZS MINI JOYS COLLECTION 4X95ML,HÄAGEN-DAZS,95ML,Pints
+3482666,Auchan,GELADO AUCHAN COCO COM COBERTURA CHOCOLATE BRANCO 4X70ML,AUCHAN,70ML,Sticks
+3482671,Auchan,GELADO AUCHAN AVELÃ COM CHOCOLATE DE LEITE 4X70ML,AUCHAN,70ML,Sticks
+3484386,Auchan,GELADO THE ICELY BROTHERS VEGAN FRAMBOESA CAKEDOUGH BIO 460ML,THE ICELY BROTHERS,460ML,Pints
+3485536,Auchan,GELADO AUCHAN STRACCIATELLA 900ML,AUCHAN,900ML,Tubs
+3492891,Auchan,Ferrero Rocher Classico 4x50g,,,Sticks
+3493331,Auchan,GELADO RAFFAELLO 4X47G,RAFFAELLO,47G,Sticks
+3557031,Auchan,SORVETE TRIBE AÇAI 160 ML,TRIBE,160 ML,Pints
+3585223,Auchan,SORVETE TRIBE GRAVIOLA 160 ML,TRIBE,160 ML,Pints
+3586321,Auchan,GELADO OREO BOMBOM 3X90ML,OREO,90ML,Sticks
+3599353,Auchan,SORVETE TRIBE GOIABA 160 ML,TRIBE,160 ML,Pints
+3599360,Auchan,SORVETE TRIBE COCO 160 ML,TRIBE,160 ML,Pints
+3609104,Auchan,GELADO BEN & JERRY'S DULCE DE-LISH SUNDAE 427ML,BEN & JERRY'S,427ML,Pints
+3609113,Auchan,Multipack Cornetto Filipinos 4x90ml,,,Cones
+3609115,Auchan,Sandwich Sabor Nata 6x100ml,,,Sandwich
+3610065,Auchan,GELADOS PINT HÄAGEN-DAZS COOKIE & DOUGH 460ML,HÄAGEN-DAZS,460ML,Pints
+3610066,Auchan,Häagen-Dazs Macaron Chocolate 420ml,,,Bites
+3610074,Auchan,Häagen-Dazs Macaron Strawberry 420ml,,,Bites
+3613168,Auchan,SACO TÉRMICO CONGELADOS AUCHAN 44.5 X 39 X 20 CM,AUCHAN,Quantidade não disponível,Other
+3617290,Auchan,GELADO OLÁ SANDWICH XXL FILIPINOS 4X130ML,OLÁ,130ML,Sandwich
+3617291,Auchan,GELADO VIENNETTA SALTED CARAMEL 650ML,VIENNETTA,650ML,Cakes
+3619261,Auchan,GELADO S/LACTOSE NUTRÉGI CHOCOLATE 500 ML,NUTRÉGI,500 ML,Pints
+3619264,Auchan,GELADO S/LACTOSE NUTRÉGI MORANGO 500 ML,NUTRÉGI,500 ML,Pints
+3630106,Auchan,GELADO VEGAN VALSOIA CHOCOLATE E AVELÃS 400G,VALSOIA,400G,Pints
+3631499,Auchan,GELADO CONE AUCHAN COCO 6X120ML,AUCHAN,120ML,Cones
+3631596,Auchan,CONE KINDER BUENO CLASSIC 248G (4 UN),KINDER,248G,Cones
+3631604,Auchan,CONE KINDER BUENO WHITE 248G (4 UN),KINDER,248G,Cones
+3632009,Auchan,Magnum Mini Caramelo Amendoa 6x55ml,,,Sticks
+3641607,Auchan,GELADO MOCHI LITTLE MOONS MANGA MARACUJÁ 192G (6UN),MOCHI LITTLE MOONS,192G,Bites
+3641616,Auchan,GELADO MOCHI LITTLE MOONS PISTACIO 192G (6UN),MOCHI LITTLE MOONS,192G,Bites
+3649662,Auchan,GELADO MOCHI LITTLE MOONS FRAMBOESA 192G (6UN),MOCHI LITTLE MOONS,192G,Bites
+3652170,Auchan,GELADO MAGNUM DOUBLE BILLIONAIRE 3X85ML,MAGNUM,85ML,Sticks
+3701429,Auchan,GELADO HÄAGEN-DAZS BAUNILHA CARAM BROWNIE 460 ML,HÄAGEN-DAZS,460 ML,Pints
+3722282,Auchan,GELADO HAPPY MRS JERSEY PISTÁCIO E AMÊNDOAS 500ML,HAPPY MRS JERSEY,500ML,Pints
+3725687,Auchan,GELADO CARTE D'OR STRACIATELLA 825ML,CARTE D'OR,825ML,Tubs
+3725692,Auchan,GELADO CARTE D'OR TIRAMISU 825ML,CARTE D'OR,825ML,Tubs
+3725694,Auchan,GELADO CARTE D'OR CHOCOLATE BROWNIE 825ML,CARTE D'OR,825ML,Tubs
+3725697,Auchan,Carte D'or Cookies & Cream 825ml,,,Tubs
+3725698,Auchan,GELADO CARTE D'OR IOGURTE E FRUTOS BOSQUE 825ML,CARTE D'OR,825ML,Tubs
+3732027,Auchan,Magnum Wonder 3x90ml,,,Sticks
+3732028,Auchan,GELADO MAGNUM MINI EUPHORIA 6X55ML,MAGNUM,55ML,Sticks
+3732034,Auchan,Ben & Jerry's Marshmallow & Smore 427ml,,,Pints
+3732037,Auchan,GELADO BEN & JERRY'S HALF BAKED 465ML,BEN & JERRY'S,465ML,Pints
+3732192,Auchan,GELADO CARTE D'OR SALTED CARAMEL 825ML,CARTE D'OR,825ML,Tubs
+3734815,Auchan,GELADO MOCHI NOKU MANGA 210G (6UN),NOKU,210G,Bites
+3736044,Auchan,GELADO OLÁ ROL 4X90ML,OLÁ,90ML,Sticks
+3736046,Auchan,SANDWICH OLÁ DISNEY LION KING 4X60ML,OLÁ,60ML,Sandwich
+3737471,Auchan,GELADO MAGNUM MENTA 3X100 ML,MAGNUM,100 ML,Sticks
+3737477,Auchan,GELADO MAGNUM CHOCO BRANCO & MORANGO 4X100ML,MAGNUM,100ML,Sticks
+3737482,Auchan,GELADO MAGNUM MULTIPACK SORTIDO 8UN,MAGNUM,Quantidade não disponível,Sticks
+3741075,Auchan,GELADO MAGNUM AMÊNDOAS 4X100ML,MAGNUM,100ML,Sticks
+3741076,Auchan,GELADO CARTE D'OR MORANGO MERENGUE 825ML,CARTE D'OR,825ML,Tubs
+3741582,Auchan,GELADO O GELADO BANOFFEE (ECONOMIA CIRCULAR) 460ML,O GELADO,460ML,Pints
+3744304,Auchan,GELADO NESTLÉ PIRULO FANTASMIKOS 15X15ML,NESTLÉ,15ML,Sticks
+3748483,Auchan,GELADO HÄAGEN-DAZS CHOCOLATE BELGA 4X95ML,HÄAGEN-DAZS,95ML,Cups
+3751137,Auchan,GELADO CORNETTO BRIGADEIRO 4X120ML,CORNETTO,120ML,Cones
+3751927,Auchan,GELADO MOCHI NOKU CHEESECAKE 210G (6UN),NOKU,210G,Bites
+3751941,Auchan,GELADO MOCHI NOKU COCO 210G ( 6UN ),NOKU,210G,Bites
+3753662,Auchan,GELADO MOCHI NOKU CHOCOLATE BLANCO 210G (6UN),NOKU,210G,Bites
+3754517,Auchan,Carte D'or Filipinos 825ml,,,Tubs
+3754520,Auchan,GELADO MAGNUM AFTER DINNER 280ML,MAGNUM,280ML,Bites
+3754607,Auchan,GELADO CARTE D'OR SOLERO EXOTIC 825ML,CARTE D'OR,825ML,Tubs
+3754611,Auchan,GELADO CARTE D'OR LEMON PIE 825ML,CARTE D'OR,825ML,Tubs
+3756924,Auchan,GELADO FERRERO ROCHER TRIPLE CARAMELO 3X60G,FERRERO ROCHER,60G,Sticks
+3756930,Auchan,GELADO NUTELLA 470 ML,NUTELLA,470 ML,Pints
+3757584,Auchan,GELADO KINDER CHOCOLATE 4X55 ML,KINDER,55 ML,Sticks
+3760443,Auchan,GELADO HÄAGEN-DAZS COFFEE 460ML,HÄAGEN-DAZS,460ML,Pints
+3773848,Auchan,GELADO CARTE D'OR VANILLA PECAN 825ML,CARTE D'OR,825ML,Tubs
+3773850,Auchan,GELADO MAGNUM DOUBLE CARAMEL CHOC 6X55ML,MAGNUM,55ML,Sticks
+3774382,Auchan,GELADO DANONINO MORANGO BANANA 6X50 ML,DANONINO,50 ML,Sticks
+3774387,Auchan,GELADO CHUPA CHUPS NATA MORANGO 5X50ML,CHUPA CHUPS,50ML,Sticks
+3774388,Auchan,GELADO SNICKERS BRANCO 6X40.8G,SNICKERS,8G,Bars
+3774390,Auchan,GELADO BOUNTY 6X39.1G,BOUNTY,1G,Bars
+3774883,Auchan,GELADO MAGNUM CARAMEL NUTS 4X64ML,MAGNUM,64ML,Sticks
+3775611,Auchan,GELADO MAGNUM BOMBONS SALTED CARAMEL 12X17ML,MAGNUM,17ML,Bites
+3775848,Auchan,GELADO BEN & JERRY'S KARAMEL SUTRA 465ML,BEN & JERRY'S,465ML,Pints
+3778810,Auchan,GELADO MAGNUM BOMBONS BILLIONAIRE 12X17ML,MAGNUM,17ML,Bites
+3790056,Auchan,GELADO OLÁ CARAMELO SALGADO 900ML,OLÁ,900ML,Tubs
+3790058,Auchan,GELADO OLÁ FRUTOS EXÓTICOS 900ML,OLÁ,900ML,Tubs
+3790059,Auchan,GELADO OLÁ BOLACHA & CHOCOLATE 900ML,OLÁ,900ML,Tubs
+3790329,Auchan,GELADO MAGNUM BOMBONS WHITE CHOCOLATE 12X17ML,MAGNUM,17ML,Bites
+3790333,Auchan,GELADO MAGNUM CLÁSSICO 3X100ML,MAGNUM,100ML,Sticks
+3797540,Auchan,GELADO SANTINI BAUNILHA 500 ML,SANTINI,500 ML,Tubs
+3800325,Auchan,GELADO SANTINI MANGA 500ML,SANTINI,500ML,Tubs
+3800328,Auchan,GELADO SANTINI CARAMELO 500ML,SANTINI,500ML,Tubs
+3801003,Auchan,GELADO AUCHAN FUSÉES LIMÃO LARANJA FRAMBOESA 8X60ML,AUCHAN,60ML,Sticks
+3801219,Auchan,GELADO VEGAN SWEE FRAMBOESA PISTACIO 450 ML,SWEE,450 ML,Pints
+3801313,Auchan,SORVETE TRIBE AÇAÍ 900 ML,TRIBE,900 ML,Tubs
+3818306,Auchan,GELADO THE ICELY BROTHERS PISTÁCHIO BIO VEGAN 460ML,THE ICELY BROTHERS,460ML,Pints
+3818310,Auchan,happy mrs jersey macadamia caramel bio 500ml,,,Pints
+3846703,Auchan,GELADO AUCHAN TUB IGLOO 20UN 800ML,AUCHAN,800ML,Tubs
+3855602,Auchan,Prozis Prot Yogurt 500ml,PROZIS,500ML,Pints
+3855610,Auchan,Prozis Sorbet Açaí Protein 500ml,PROZIS,500ML,Pints
+3872288,Auchan,GELADO O GELADO SORBET BANANA (ECONOMIA CIRCULAR) 460 ML,O GELADO,460 ML,Pints
+3879313,Auchan,GELADO CARTE D'OR BAUNILHA 1.3L,CARTE D'OR,Quantidade não disponível,Tubs
+3882668,Auchan,GELADO AUCHAN COLLECTION CHEESECAKE MORANGO 450ML,AUCHAN COLLECTION,450ML,Pints
+3883126,Auchan,Auchan Collection Maracujá C/Polpa Da Fruta 450ml,,,
+3883145,Auchan,GELADO AUCHAN COLLECTION CARAMELO COM FLOR DE SAL 450ML,AUCHAN COLLECTION,450ML,Pints
+3884133,Auchan,Auchan Collection Ovos Moles De Aveiro Igp 450ml,,,
+3884726,Auchan,GELADO PINT MAGNUM DOUBLE AVELÃ 440ML,MAGNUM,440ML,Pints
+3884747,Auchan,Olá Filipinos Stick 4x62ml,,,Sticks
+3884817,Auchan,GELADO CORNETTO MAX TROPICAL 4X90ML,CORNETTO,90ML,Cones
+3884819,Auchan,Ben & Jerry's Brokie Cream 465ml,,,Pints
+3884829,Auchan,GELADO MAGNUM AFTER DINNER FRAC 8X35ML,MAGNUM,35ML,Bites
+3884841,Auchan,Magnum Gold Caramel Bilionaire 4x64ml,,,Bars
+3884853,Auchan,GELADO MAGNUM DOUBLE CEREJA 3X85ML,MAGNUM,85ML,Sticks
+3884855,Auchan,GELADO MAGNUM DOUBLE AVELÃ 3X85ML,MAGNUM,85ML,Sticks
+3884859,Auchan,GELADO MAGNUM MINI CLÁSSICO PROMO 6X55ML,MAGNUM MINI,55ML,Sticks
+3884864,Auchan,GELADO CORNETTO BAUNILHA 4X90ML,CORNETTO,90ML,Cones
+3885990,Auchan,GELADO PALITO AUCHAN CARAMELO SALGADO 4X100ML,AUCHAN,100ML,Sticks
+3889424,Auchan,SORBET AUCHAN MORANGO C/PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3890258,Auchan,GELADO PALITO AUCHAN CHOCOLATE BRANCO 4X110ML,AUCHAN,110ML,Sticks
+3890351,Auchan,Palito Polegar Baunilha E Chocolate 12x55ml,,,Sticks
+3890437,Auchan,GELADO PALITO AUCHAN PISTACHIO 4X100ML,AUCHAN,100ML,Sticks
+3890537,Auchan,GELADO PALITO AUCHAN CAFÉ 4X100ML,AUCHAN,100ML,Sticks
+3890541,Auchan,GELADO AUCHAN CHOCOLATE PRETO COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3890602,Auchan,GELADO AUCHAN 3 CHOCOLATES 900ML,AUCHAN,900ML,Tubs
+3890646,Auchan,GELADO AUCHAN CARAMELO SALGADO 900ML,AUCHAN,900ML,Tubs
+3890659,Auchan,GELADO AUCHAN FRUTOS VERMELHOS 900ML,AUCHAN,900ML,Tubs
+3890766,Auchan,GELADO AUCHAN AVELÃ COM MOLHO DE AVELÃ 900ML,AUCHAN,900ML,Tubs
+3890870,Auchan,SORVETE BIO FACTORY AÇAÍ 480ML,BIO FACTORY,480ML,Pints
+3890876,Auchan,GELADO VEGETAL MINI NATURATTIVA COCO CACAU 200G (4UN),NATURATTIVA,200G,Sticks
+3891927,Auchan,GELADO PALITO AUCHAN MINI SORTIDOS 8X45ML,AUCHAN,45ML,Sticks
+3891973,Auchan,GELADO HÄAGEN-DAZS TIRAMISU ROMA 420ML,HÄAGEN-DAZS,420ML,Pints
+3891976,Auchan,GELADO PALITO AUCHAN AMENDOIM 4X90ML,AUCHAN,90ML,Sticks
+3891977,Auchan,GELADO PALITO AUCHAN CHOCOLATE BRANCO COM AMÊNDOAS 4X110ML,AUCHAN,110ML,Sticks
+3891983,Auchan,Häagen-Dazs Churros Madrid 420ml,,,Pints
+3891996,Auchan,GELADO AUCHAN KIDS BAUNILHA CHOCOLATE E MORANGO 12X60ML,AUCHAN,60ML,Sticks
+3892001,Auchan,GELADO OLÁ PERNA DE PAU CONE 4X90ML,OLÁ,90ML,Cones
+3892030,Auchan,GELADO CONES AUCHAN MINI BAUNILHA CHOCOLATE 8X70ML,AUCHAN,70ML,Cones
+3892032,Auchan,GELADO AUCHAN BAUNILHA NOZES-PECÃS 900ML,AUCHAN,900ML,Tubs
+3892098,Auchan,GELADO AUCHAN PISTACHIO COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3901180,Auchan,GELADO RAFFAELLO PEACH DREAM TRIPLE EXPERIENCE (60X3),RAFFAELLO,Quantidade não disponível,Sticks
+3903191,Auchan,GELADO CONE AUCHAN BAUNILHA 6X120ML,AUCHAN,120ML,Cones
+3903200,Auchan,SORBET AUCHAN FRAMBOESA COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3903213,Auchan,GELADO CONE AUCHAN FRUTOS VERMELHOS 6X120ML,AUCHAN,120ML,Cones
+3903218,Auchan,GELADO CONE AUCHAN BAUNILHA E CHOCOLATE 6X120ML,AUCHAN,120ML,Cones
+3903228,Auchan,GELADO PALITO AUCHAN CHOCOLATE PISTACHIO 12X60ML,AUCHAN,60ML,Sticks
+3903234,Auchan,GELADO AUCHAN COCO COM COCO RALADO 1L,AUCHAN,Quantidade não disponível,Tubs
+3903272,Auchan,GELADO CONE AUCHAN BAUNILHA PRALINÉ 6X120ML,AUCHAN,120ML,Cones
+3903293,Auchan,GELADO PALITO AUCHAN BAUNILHA CHOCOLATE 12X60ML,AUCHAN,60ML,Sticks
+3903302,Auchan,GELADO CONE AUCHAN CHOCOLATE PISTACHIO 6X120ML,AUCHAN,120ML,Cones
+3903304,Auchan,SORBET AUCHAN MAÇÃ COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3903309,Auchan,GELADO PALITO AUCHAN LIMÃO MERENGUE 4X100ML,AUCHAN,100ML,Sticks
+3903327,Auchan,GELADO CONE AUCHAN BAUNILHA MORANGO 6X120ML,AUCHAN,120ML,Cones
+3903330,Auchan,GELADO PALITO AUCHAN BAUNILHA AVELÃ 12X60ML,AUCHAN,60ML,Sticks
+3903332,Auchan,GELADO PALITO AUCHAN BAUNILHA MORANGO 12X60ML,AUCHAN,60ML,Sticks
+3903333,Auchan,GELADO CONE AUCHAN CRÈME BRÛLÉE 6X120ML,AUCHAN,120ML,Cones
+3903334,Auchan,Polegar Baunilha 1l,,,Tubs
+3903336,Auchan,GELADO CONE AUCHAN CHOCOLATE 6X120ML,AUCHAN,120ML,Cones
+3903339,Auchan,GELADO CONE AUCHAN BAUNILHA CARAMELO 6X120ML,AUCHAN,120ML,Cones
+3903341,Auchan,SORBET AUCHAN GROSELHA-NEGRA COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3903342,Auchan,SORBET AUCHAN PERA COM PEDAÇOS 1L,AUCHAN,Quantidade não disponível,Tubs
+3903345,Auchan,GELADO PALITO AUCHAN BAUNILHA AMÊNDOAS 4X120ML,AUCHAN,120ML,Sticks
+3903346,Auchan,GELADO AUCHAN BIO BAUNILHA 900ML,AUCHAN BIO,900ML,Tubs
+3903976,Auchan,GELADO VEGAN SWEE CHOCOLAE CAKE WITH BROWNIES 450 ML,SWEE,450 ML,Pints
+3903983,Auchan,GELADO VEGAN SWEE CARAMEL BROWN 450 ML,SWEE,450 ML,Pints
+3903989,Auchan,GELADO VEGAN SWEE DATE NIGHT FONDUE 450 ML,SWEE,450 ML,Pints
+3903992,Auchan,GELADO VEGAN SWEE COOKIES SCREAMING 450ML,SWEE,450ML,Pints
+3907733,Auchan,GELADO VEGETAL NATURATTIVA SOJA CACAU AVELÂ 3UN 240G,NATURATTIVA,240G,Sticks
+3911756,Auchan,GELADO O GELADO PESSEGO MELBA 460ML,O GELADO,460ML,Pints
+3913159,Auchan,SORBET PALITO AUCHAN MULTI FRUITS 8X69ML,AUCHAN,69ML,Sticks
+3913174,Auchan,SORBET PALITO AUCHAN MAÇÃ FRUTOS VERMELHOS 8X69ML,AUCHAN,69ML,Sticks
+3916949,Auchan,GELADO VEGAN SWEE MANGA COM PEDAÇOS BOLACHA 450ML,SWEE,450ML,Pints
+3916973,Auchan,SWEETIES SWEE MANGA E RED VELVET FRAMBOESA 125G,SWEE,125G,Bites
+3916981,Auchan,SWEETIES SWEE FRAMBOESA E PISTACIO 125G,SWEE,125G,Bites
+3916984,Auchan,SWEETIES SWEE FRAMBOESA E CHOCOLATE DE LEITE 125G,SWEE,125G,Bites
+3919794,Auchan,GELADO O GELADO DUBAI CHOCO STYLE 460ML,O GELADO,460ML,Pints
+3921841,Auchan,GELADO LA MENORQUINA BLUE COLA SUPER MAN 3 UN,LA MENORQUINA,Quantidade não disponível,Pots
+3921844,Auchan,CONE LA MENORQUINA NATA COM PEDAÇOS DE BOLACHA 4 UN,LA MENORQUINA,Quantidade não disponível,Cones
+3921845,Auchan,SANDWICH LA MENORQUINA POP CORN CARAMELO 3UN,LA MENORQUINA,Quantidade não disponível,Sandwich
+3927996,Auchan,GELADOS CARTE D'OR ROMANTICA 1LT,CARTE D'OR,Quantidade não disponível,Tubs
+3932921,Auchan,GELADO SNICKERS 4X100G,SNICKERS,100G,Bars
+3932980,Auchan,GELADO SANDWICH OREO MINI 6X55ML,OREO,55ML,Sandwich
+3932983,Auchan,GELADO SANDWICH MAXIBON RED CHEESECAKE 4X87G,MAXIBON,87G,Sandwich
+3933190,Auchan,GELADO BEN & JERRY'S BOHEMIAN RASPBERRY 465ML,BEN & JERRY'S,465ML,Pints
+3933194,Auchan,GELADO CARTE D'OR CORNETTO 825ML,CARTE D'OR,825ML,Tubs
+3933202,Auchan,GELADO OLÁ TWISTER MINI ANANÁS 6X50ML,OLÁ,50ML,Sticks
+3935068,Auchan,POTE AÇAÍ OAKBERRY BIO 473ML,OAKBERRY,473ML,Pints
+3939270,Auchan,SORVETE TRIBE AÇAÍ 2.5L,TRIBE,Quantidade não disponível,Tubs
+3962757,Auchan,,,,
+3983482,Auchan,GELADO PALITO AUCHAN MINI BAUNILHA AMÊNDOA 6X50ML,AUCHAN,50ML,Sticks
+3994366,Auchan,GELADO BEN & JERRY'S CHURROS 465ML,BEN & JERRY'S,465ML,Pints
+3994371,Auchan,GELADO MAGNUM BRANCO 3X100ML,MAGNUM,100ML,Sticks
+3994376,Auchan,GELADO BEN & JERRY'S SWEET MANGO 465ML,BEN & JERRY'S,465ML,Pints
+3994381,Auchan,GELADO MAGNUM LA PISTACHE 3X90ML,MAGNUM,90ML,Sticks
+4012898,Auchan,GELADO AUCHAN SPECULOOS 900ML,AUCHAN,900ML,Tubs
+4012901,Auchan,GELADO AUCHAN CARAMELO SALGADO COM PEDAÇOS 500ML,AUCHAN,500ML,Pints
+4012904,Auchan,GELADO AUCHAN COOKIE DOUGH 500ML,AUCHAN,500ML,Pints
+4012908,Auchan,GELADO AUCHAN TUTTI FRUTTI 5UN 375ML,AUCHAN,375ML,Sticks
+4013230,Auchan,CUBOS GELO EM COPO 528 130G,528,130G,Other
+4013609,Auchan,GELADO OLÁ HARIBO PUSH-UP 4X85ML,OLÁ,85ML,Sticks
+4013908,Auchan,GELADO CARTE D'OR PISTACHIO 825ML,CARTE D'OR,825ML,Tubs
+4013909,Auchan,GELADO BEN & JERRY'S CHUNKY MONKEY 465ML,BEN & JERRY'S,465ML,Pints
+4013910,Auchan,GELADO CARTE D'OR 3 SABORES 1300ML,CARTE D'OR,1300ML,Tubs
+4013911,Auchan,GELADO CARTE D'OR CORNETTO MORANGO 750ML,CARTE D'OR,750ML,Tubs
+4013912,Auchan,GELADO CORNETTO LIMÃO 6X90ML,CORNETTO,90ML,Cones
+4013913,Auchan,GELADO CORNETTO PISTACHIO 4X90ML,CORNETTO,90ML,Cones
+4013914,Auchan,GELADO BEN & JERRY'S COOKIE DOUGH SANDWICH 4X68ML,BEN & JERRY'S,68ML,Sandwich
+4013915,Auchan,GELADO MAGNUM LA PECHE 3X90ML,MAGNUM,90ML,Sticks
+4013916,Auchan,GELADO MAGNUM BOMBONS CHOCOLATE BRANCO E CEREJA 12X17ML,MAGNUM,17ML,Bites
+4013917,Auchan,GELADO PINT MAGNUM PISTACHO 440ML,MAGNUM,440ML,Pints
+4013918,Auchan,GELADO MAGNUM MINI LA PISTACHE 6X55ML,MAGNUM MINI,55ML,Sticks
+4013919,Auchan,GELADO SOLERO TWIST MORANGO 3X90ML,SOLERO,90ML,Sticks
+4013920,Auchan,GELADO MAGNUM MINI CHOCOLATE BRANCO E COOKIES 6X55ML,MAGNUM MINI,55ML,Sticks
+4014031,Auchan,GELADO MAGNUM MINI CHOCOLATE BRANCO E MORANGO 6X55ML,MAGNUM MINI,55ML,Sticks
+4014164,Auchan,GELADO MAGNUM AMÊNDOAS 8X100ML,MAGNUM,100ML,Sticks
+4014165,Auchan,GELADO SOLERO MINI EXOTIC & RED BERRY 6X50ML,SOLERO,50ML,Sticks
+4014166,Auchan,GELADO OLÁ FEAST CARAMELO 4X90ML,OLÁ,90ML,Sticks
+4014167,Auchan,GELADO HÄAGEN-DAZS STRAWBERRY MOCHI 420ML,HÄAGEN-DAZS,420ML,Pints
+4014168,Auchan,GELADO HÄAGEN-DAZS CHOCOLATE BROWNIE 420ML,HÄAGEN-DAZS,420ML,Pints
+4016299,Auchan,GELADO MAGNUM SANDWICH AMÊNDOAS 4X140ML,MAGNUM,140ML,Sandwich
+4025550,Auchan,SWEETIES SWEE FRAMBOESA E PISTÁCHIO 140G,SWEE,140G,Bites
+4026611,Auchan,SWEETIES SWEE FRAMBOESA E CHOCOLATE DE LEITE 140G,SWEE,140G,Bites
+4029181,Auchan,FRAMBOESAS FRANUÍ COBERTAS COM CHOCOLATE BRANCO E CHOCOLATE NEGRO 150G,FRANUÍ,150G,Frozen Fruits
+4029417,Auchan,FRAMBOESAS FRANUÍ COBERTAS COM CHOCOLATE BRANCO E CHOCOLATE DE LEITE 150G,FRANUÍ,150G,Frozen Fruits
+42352,Auchan,GELADO HÄAGEN-DAZS BAUNILHA 460ML,HÄAGEN-DAZS,460ML,Pints
+42354,Auchan,GELADO HÄAGEN-DAZS MORANGO 460ML,HÄAGEN-DAZS,460ML,Pints
+42357,Auchan,GELADO HÄAGEN-DAZS COOKIES & CREAM 460ML,HÄAGEN-DAZS,460ML,Pints
+42359,Auchan,GELADO HÄAGEN-DAZS BAUNILHA PRALINE 460ML,HÄAGEN-DAZS,460ML,Pints
+42361,Auchan,GELADO HÄAGEN-DAZS NOZES DE MACADÂMIA 460ML,HÄAGEN-DAZS,460ML,Pints
+42363,Auchan,GELADO HÄAGEN-DAZS CHOCOLATE BELGA 460ML,HÄAGEN-DAZS,460ML,Pints
+42372,Auchan,GELADO HÄAGEN-DAZS STRAWBERRY CHEESECAKE 460ML,HÄAGEN-DAZS,460ML,Pints
+483,Auchan,GELADO VIENNETTA BAUNILHA 650ML,VIENNETTA,650ML,Cakes
+570539,Auchan,GELADO MAGNUM MULTIPACK MINI 3 CHOCOLATES 6X55ML,MAGNUM,55ML,Sticks
+607428,Auchan,GELADO VIENNETTA CHOCOLATE 650ML,VIENNETTA,650ML,Cakes
+634554,Auchan,GELADO AUCHAN MINI SANDWICH NATA 6X85ML,AUCHAN,85ML,Sandwich
+656959,Auchan,GELADO PALITO AUCHAN BAUNILHA E CHOCOLATE LEITE 4X120ML,AUCHAN,120ML,Sticks
+779956,Auchan,GELADO AUCHAN MORANGO COM PEDAÇOS DE MORANGO 1L,AUCHAN,Quantidade não disponível,Tubs
+779967,Auchan,GELADO AUCHAN BAUNILHA 1L,AUCHAN,Quantidade não disponível,Tubs
+798907,Auchan,GELADO AUCHAN CAFÉ COM PEPITAS CAFÉ E CHOCOLATE PRETO 1L,AUCHAN,Quantidade não disponível,Tubs
+827147,Auchan,GELADO MAGNUM MULTIPACK MINI INTENSE DARK 70% 6X55ML,MAGNUM,55ML,Sticks
+888799,Auchan,GELADO HÄAGEN-DAZS CARAMEL BISCUIT & CREAM 460ML,HÄAGEN-DAZS,460ML,Pints
+955989,Auchan,GELADO MAGNUM MULTIPACK MINI AMÊNDOAS 6X55ML,MAGNUM,55ML,Sticks
+976275,Auchan,GELADO CARTE D'OR MENTA 1000ML,CARTE D'OR,1000ML,Tubs
+986118,Auchan,SORBET AUCHAN ANANÁS 1L,AUCHAN,Quantidade não disponível,Tubs
+986125,Auchan,SORBET AUCHAN MANGA 1L,AUCHAN,Quantidade não disponível,Tubs
+986129,Auchan,SORBET AUCHAN DE LIMÃO 1L,AUCHAN,Quantidade não disponível,Tubs
+986154,Auchan,GELADOS DE LEITE AUCHAN CHOCOLATE MORANGO E BAUNILHA 6X100ML,AUCHAN,100ML,Sticks
+986157,Auchan,GELADO AUCHAN DE NATA 1L,AUCHAN,Quantidade não disponível,Tubs
+1000705,PingoDoce,Mini Churros de Chocolate e Avelã Congelados,Pingo Doce,"0.17 Kg | 15,82 €/Kg",Other
+1002327,PingoDoce,Açaí Original,Oakberry,"0.473 L | 19,01 €/L",
+1002541,PingoDoce,Gelado de Chocolate e Avelã Choco Nutty,Pingo Doce,"0.47 L | 7,43 €/L",Pints
+1002629,PingoDoce,Gelado Sandwich Filipinos e Caramelo,Filipinos,"0.52 L | 7,67 €/L",Sandwich
+1002630,PingoDoce,Gelado de Chocolate e Baunilha,Carte D'Or,"1.7 L | 3,52 €/L",Tubs
+1002631,PingoDoce,Gelado Sweet Mango Memories,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+1002632,PingoDoce,Gelados de Chocolate Branco,Magnum,"0.3 L | 9,97 €/L",Sticks
+1002633,PingoDoce,Gelado La Pistache,Magnum,"0.27 L | 12,19 €/L",Sticks
+1002634,PingoDoce,Gelados Cornetto de Limão,Cornetto,"0.54 L | 6,46 €/L",Cones
+1003923,PingoDoce,Gelado de Morango Strawberry Twist,Solero,"0.27 L | 14,78 €/L",Sticks
+1003924,PingoDoce,Gelado Pint Pistáchio,Magnum,"0.44 L | 9,52 €/L",Pints
+1003925,PingoDoce,Gelado Soft & Crunchy Cornetto de Morango,Carte D'Or,"0.75 L | 3,99 €/L",Tubs
+1003926,PingoDoce,Gelados Solero Mini Exotic e Berry Bliss,Solero,"0.3 L | 9,97 €/L",Sticks
+1003927,PingoDoce,Gelados Mini Chocolate Branco e Morango,Magnum,"0.33 L | 18,15 €/L",Sticks
+1003928,PingoDoce,Gelados Cornetto Max Pistáchio,Cornetto,"0.36 L | 16,64 €/L",Cones
+1003934,PingoDoce,Gelado Churros,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+1003935,PingoDoce,Gelados Signature Pêssego e Chocolate,Magnum,"0.27 L | 12,19 €/L",Sticks
+1003936,PingoDoce,Gelados Mini Signature Pistáchio e Chocolate,Magnum,"0.33 L | 21,18 €/L",Sticks
+1005114,PingoDoce,Mini Bolas de Gelado de Manga,Sorbites,"0.072 Kg | 41,53 €/Kg",Bites
+1005115,PingoDoce,Mini Bolas de Gelado de Frutos Vermelhos,Sorbites,"0.072 Kg | 41,53 €/Kg",Bites
+1005457,PingoDoce,Gelados Bombom Chocolate e Cereja,Magnum,"0.204 L | 19,56 €/L",Bites
+1005458,PingoDoce,"Gelado de Chocolate, Morango e Baunilha",Carte D'Or,"1.3 L | 2,3 €/L",Tubs
+1006476,PingoDoce,Mini Churros com Doce de Leite,Pingo Doce,"0.17 Kg | 15,82 €/Kg",Other
+1007716,PingoDoce,Gelados Majestic Tropical com Manga e Maracujá,Pingo Doce,"0.4 L | 8,73 €/L",Sticks
+1007717,PingoDoce,Gelado de Iogurte Natural,Pingo Doce,"0.5 L | 6,58 €/L",Pints
+1008051,PingoDoce,Mini Bolas de Gelado Cookie Dough Caramelo,Pingo Doce,"6 Un | 0,8 €/Un",Bites
+1008052,PingoDoce,Mini Bolas de Gelado Cookie Dough Baunilha,Pingo Doce,"6 Un | 0,8 €/Un",Bites
+1008886,PingoDoce,Gelado de Baunilha e Morango,Carte D'Or,"1.7 L | 4,7 €/L",
+1008971,PingoDoce,Gelado Solero Exótico XL,Solero,"0.54 L | 6,46 €/L",
+1008972,PingoDoce,Gelados Sandwich,Magnum,"0.56 L | 14,27 €/L",
+1008973,PingoDoce,Gelados Feast Caramelo,Olá,"0.36 L | 13,86 €/L",
+1008974,PingoDoce,Gelados de Caramelo Salgado,Magnum,"0.3 L | 16,63 €/L",
+1008979,PingoDoce,Gelados Cookie Dough Sandwich,Ben & Jerry's,"0.272 L | 18,35 €/L",
+1009025,PingoDoce,Gelado Pitaya e Maracujá 0%,Native,"0.16 L | 16,25 €/L",
+1009026,PingoDoce,Gelado Truficone,La Menorquina,"0.26 Kg | 19,19 €/Kg",
+1009121,PingoDoce,Gelados Haribo Push Up,Olá,"0.34 L | 14,68 €/L",
+1009242,PingoDoce,Gelado de Pistáchio,Carte D'Or,"0.825 L | 7,26 €/L",
+1009244,PingoDoce,Gelado Mini Barra,Reeses,"0.302 L | 18,18 €/L",
+1009274,PingoDoce,Pedaços de Ananás Cobertos com Chocolate Branco e Coco,Pingo Doce,"0.1 Kg | 26,9 €/Kg",Bites
+1009275,PingoDoce,Rodelas de Banana Cobertas com Chocolate de Leite,Pingo Doce,"0.1 Kg | 26,9 €/Kg",Bites
+1009297,PingoDoce,Gelado Cone de Baunilha e Pistachio,Pingo Doce,"0.44 L | 5,66 €/L",Cones
+1009314,PingoDoce,Gelados de Amêndoas Vegan,Magnum,"0.27 L | 22,19 €/L",
+1009332,PingoDoce,Gelado de Avelã,Pingo Doce,"1 L | 2,99 €/L",Tubs
+19556,PingoDoce,Gelado de Baunilha,Viennetta,"0.65 L | 3,98 €/L",Cakes
+39237,PingoDoce,Gelado Chocolate,Pingo Doce,"1 L | 2,89 €/L",Tubs
+39238,PingoDoce,Gelado Morango Pingo Doce 1000 ml,Pingo Doce,"1 L | 2,74 €/L",Tubs
+419521,PingoDoce,Gelado Seleção Caramelo,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+419526,PingoDoce,Gelado Seleção Stracciatella,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+437830,PingoDoce,Gelado Strawberry Cheesecake,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+485998,PingoDoce,Gelado Mini Sandwich,Pingo Doce,"0.51 L | 5,86 €/L",Sandwich
+527533,PingoDoce,Gelado Sensações Duo Chocolate,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+559492,PingoDoce,Profiteroles Congelados,Pingo Doce,"0.3 Kg | 9,63 €/Kg",Other
+622764,PingoDoce,Gelados Mini Majestic Mix,Pingo Doce,"0.48 L | 6,65 €/L",Sticks
+622766,PingoDoce,Tarte Gelada Nata e Chocolate,Pingo Doce,"1 L | 2,49 €/L",Cakes
+622767,PingoDoce,Tarte Gelada Capuccino,Pingo Doce,"1 L | 2,49 €/L",Cakes
+622768,PingoDoce,Tarte Gelada Nata e Morango,Pingo Doce,"1 L | 2,49 €/L",Cakes
+646990,PingoDoce,Petit Gateau com Recheio de Chocolate de Leite,Pingo Doce,"0.32 Kg | 12,34 €/Kg",Other
+650947,PingoDoce,Petit Gateau com Recheio de Chocolate Negro,Pingo Doce,"0.32 Kg | 12,34 €/Kg",Other
+656612,PingoDoce,Gelado Menta e Chocolate,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+657248,PingoDoce,Gelado de Baunilha sem Açúcar,Pingo Doce,"0.5 L | 4,98 €/L",Pints
+657249,PingoDoce,Gelado de Chocolate sem Açúcar,Pingo Doce,"0.5 L | 4,98 €/L",Pints
+657250,PingoDoce,Gelado de Morango Sem Açúcar,Pingo Doce,"0.5 L | 4,98 €/L",Pints
+658097,PingoDoce,Gelados Cones Chocolate,Pingo Doce,"0.72 L | 3,74 €/L",Cones
+658098,PingoDoce,Gelados Cones Morango,Pingo Doce,"0.72 L | 3,74 €/L",Cones
+658963,PingoDoce,Gelados Cones Clássicos,Pingo Doce,"0.72 L | 3,74 €/L",Cones
+671010,PingoDoce,Gelado Super Maxi,Olá,"0.39 L | 7,67 €/L",Sticks
+671030,PingoDoce,Gelado Perna de Pau,Olá,"0.42 L | 7,12 €/L",Sticks
+731664,PingoDoce,Pastéis de Nata sem Glúten,Pura Vida,"0.33 Kg | 12,09 €/Kg",Other
+738686,PingoDoce,Gelado Super Mix,Calippo,"0.525 L | 5,7 €/L",Pots
+746073,PingoDoce,Gelado Baunilha,Pingo Doce,"1 L | 2,29 €/L",Tubs
+747546,PingoDoce,Gelado Fizz Limão,Olá,"0.36 L | 8,31 €/L",Sticks
+755209,PingoDoce,"Gelado de Café, Chocolate e Caramelo",Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+774976,PingoDoce,Gelados Tubitos Limão e Morango,Pingo Doce,"0.66 L | 4,38 €/L",Pots
+775523,PingoDoce,Gelado Cone de Chocolate,Cornetto,"0.54 L | 6,46 €/L",Cones
+775524,PingoDoce,Gelado Cone Clássico,Cornetto,"0.54 L | 6,46 €/L",Cones
+775647,PingoDoce,Gelado Morango,Calippo,"0.525 L | 5,7 €/L",Pots
+775908,PingoDoce,Gelado Cone de Morango,Cornetto,"0.54 L | 6,46 €/L",Cones
+821625,PingoDoce,Gelados Cones Caramelo e Baunilha,Pingo Doce,"0.72 L | 3,74 €/L",Cones
+821647,PingoDoce,Gelados Mini Majestic Amêndoas,Pingo Doce,"0.48 L | 6,85 €/L",Sticks
+839588,PingoDoce,Gelado Mini Double Framboesa,Magnum,"0.33 L | 21,18 €/L",Sticks
+856635,PingoDoce,Gelado de Chocolate Clássico,Magnum,"0.44 L | 7,93 €/L",Pints
+856636,PingoDoce,Gelado Magnum Amêndoas,Magnum,"0.44 L | 9,07 €/L",Pints
+860048,PingoDoce,"Gelado Mini Chocolate Branco, Clássico, e Amêndoa",Magnum,"0.33 L | 19,06 €/L",Sticks
+860049,PingoDoce,Gelado Mini Chocolate e Amêndoas,Magnum,"0.33 L | 18,15 €/L",Sticks
+862647,PingoDoce,Gelado Peanut Butter Crunch,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+865158,PingoDoce,Gelado Caramelo Salgado,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+866226,PingoDoce,Gelado Cornetto Mini Clássico,Cornetto,"0.48 L | 8,31 €/L",
+877321,PingoDoce,Gelado de Cheesecake Morango,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878023,PingoDoce,Gelado de Morango e Nata,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878024,PingoDoce,Gelado de Chocolate Belga,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878025,PingoDoce,Gelado de Caramelo Salgado,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878026,PingoDoce,Gelado Speculoos Caramel Biscuit,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878027,PingoDoce,Gelado de Macadâmia,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878028,PingoDoce,Gelado Cookies & Cream,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878029,PingoDoce,Gelado Praliné & Cream,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878030,PingoDoce,Gelado Doce Leite,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878031,PingoDoce,Gelado de Manga e Framboesa,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+878036,PingoDoce,Gelado de Doce de Leite Mini,Häagen-Dazs,"0.095 L | 31,05 €/L",Pints
+883040,PingoDoce,Gelado de Chocolate Branco e Cookies,Magnum,"0.44 L | 9,07 €/L",Pints
+883041,PingoDoce,Gelado Mini Chocolate Branco e Cookies,Magnum,"0.33 L | 15,12 €/L",Sticks
+883043,PingoDoce,Gelado Double Caramelo Salgado,Magnum,"0.44 L | 9,07 €/L",Pints
+887549,PingoDoce,Gelados Caramel Collection Mini Pack 4,Häagen-Dazs,"0.38 L | 21,03 €/L",Cups
+888023,PingoDoce,Gelados Chocolate Collection Mini Pack 4,Häagen-Dazs,"0.38 L | 21,03 €/L",Cups
+908731,PingoDoce,Gelado Feast,Olá,"0.36 L | 8,31 €/L",Sticks
+908733,PingoDoce,Gelado Ben & Jerry's Strawberry Cheesecake,Ben & Jerry's,"0.465 L | 10,73 €/L",
+908734,PingoDoce,Gelado Chocolate Fudge Brownie,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+908737,PingoDoce,Gelado Caramel Brownie Party,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+908740,PingoDoce,Gelado Peanut Butter Cup,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+909553,PingoDoce,Gelados Fruit Collection Mini Pack 4,Häagen-Dazs,"0.326 L | 24,51 €/L",Cups
+909557,PingoDoce,Gelado Cookie Dough,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints
+910854,PingoDoce,,,,
+910855,PingoDoce,Gelado Proteína Caramelo Salgado,Go Active,"0.5 L | 6,58 €/L",Pints
+923198,PingoDoce,Gelado Gold Caramel Billionaire,Magnum,"0.44 L | 9,07 €/L",Pints
+923201,PingoDoce,Gelado Double Gold Caramel Billionaire,Magnum,"0.33 L | 21,18 €/L",Sticks
+928314,PingoDoce,,,,
+928318,PingoDoce,Gelado em Barra,Twix,"0.259 L | 11,54 €/L",Bars
+928322,PingoDoce,Gelado Caramelo e Manteiga Amendoim Cobertura Chocolate,Snickers,"0.302 L | 19,83 €/L",Bars
+928323,PingoDoce,Gelado Barra 6UN,Mars,"0.297 L | 13,1 €/L",Bars
+930308,PingoDoce,"Gelado Mini Chocolate Branco, Clássico, e Amêndoa",Magnum,"0.55 L | 18,16 €/L",Sticks
+932288,PingoDoce,Gelados Ice Up,Pingo Doce,"0.32 L | 9,34 €/L",Sticks
+942259,PingoDoce,Gelado Solero Exótico,Solero,"0.27 L | 14,78 €/L",Sticks
+942541,PingoDoce,Gelados The Mini Joys Collection Pack 4,Häagen-Dazs,"0.32 L | 24,97 €/L",Cups
+955908,PingoDoce,Gelado Ben & Jerry's Half Baked,Ben & Jerry's,"0.465 L | 10,73 €/L",
+956781,PingoDoce,Gelado de Natas Frescas,Pingo Doce,"1 L | 2,74 €/L",Tubs
+956782,PingoDoce,Sorbet de Manga,Pingo Doce,"1 L | 2,99 €/L",Tubs
+958601,PingoDoce,Sorbet de Morango,Pingo Doce,"1 L | 3,49 €/L",Tubs
+961131,PingoDoce,Gelado Mochi Morango,Pingo Doce,"0.14 Kg | 21,36 €/Kg",Bites
+961275,PingoDoce,Gelado Tiramisu,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+961291,PingoDoce,Gelado Sandwich XXL Filipinos,Olá,"0.52 L | 7,67 €/L",Sandwich
+962383,PingoDoce,Gelado Pirulitos,Pingo Doce,"0.368 L | 5,41 €/L",Sticks
+962923,PingoDoce,Gelado Mini Double Caramelo,Magnum,"0.33 L | 21,18 €/L",Sticks
+963351,PingoDoce,Gelado Azul,Pingo Doce,"0.95 L | 2,05 €/L",Tubs
+970144,PingoDoce,Gelado de Baunilha,Häagen-Dazs,"0.46 L | 17,37 €/L",Pints
+970201,PingoDoce,Gelado de Pistáchio,Pingo Doce,"0.5 L | 7,98 €/L",Pints
+970498,PingoDoce,Gelado Mini Collection Pink Lemonade,Magnum,"0.33 L | 21,18 €/L",Sticks
+970504,PingoDoce,Gelado Tiramisu Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+970901,PingoDoce,Crepes com Chocolate Congelados,Pingo Doce,"0.54 Kg | 5,72 €/Kg",Other
+971074,PingoDoce,Gelado Salted Caramel Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+971117,PingoDoce,Gelado Chocolate Brownie Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+971642,PingoDoce,Gelado Rol,Olá,"0.36 L | 8,31 €/L",Sticks
+971695,PingoDoce,Gelado Chocolate Branco e Morango,Magnum,"0.4 L | 9,98 €/L",Sticks
+971819,PingoDoce,Panquecas de Banana e Espelta Congeladas,Pingo Doce,"0.24 Kg | 13,71 €/Kg",Other
+972232,PingoDoce,Gelado Baunilha Exótica Solero Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+972817,PingoDoce,Gelado Cone Brigadeiro,Cornetto,"0.48 L | 12,48 €/L",Cones
+974156,PingoDoce,Gelado Chocolate e Amêndoa,Magnum,"0.4 L | 9,98 €/L",Sticks
+974157,PingoDoce,Gelado de Menta,Magnum,"0.3 L | 13,3 €/L",Sticks
+974161,PingoDoce,Gelado Morango e Merengue Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+974228,PingoDoce,Gelado Majestic Limão,Pingo Doce,"0.6 L | 6,48 €/L",Sticks
+974247,PingoDoce,Gelado Mochi Limão,Pingo Doce,"0.14 Kg | 21,36 €/Kg",Bites
+974640,PingoDoce,"Gelado Chocolate Clássico, Amêndoa e Chocolate Branco",Magnum,"0.8 L | 7,49 €/L",Sticks
+975275,PingoDoce,Gelado After Dinner,Magnum,"0.28 L | 26,75 €/L",Bites
+975473,PingoDoce,Gelado Mini Majestic Duplo Caramelo,Pingo Doce,"0.33 L | 11,18 €/L",Sticks
+975482,PingoDoce,Gelado de Morango e Banana,Danonino,"0.3 L | 16,63 €/L",Sticks
+975483,PingoDoce,Gelado Barra Chocolate Branco 6UN,Snickers,"0.264 L | 22,69 €/L",Bars
+975484,PingoDoce,Gelado Barra 6UN,Bounty,"0.3 L | 12,97 €/L",Bars
+975489,PingoDoce,Gelado Mini Double Chocolate e Caramelo Pack 6,Magnum,"0.33 L | 13,61 €/L",
+975490,PingoDoce,Gelado Baunilha e Noz Pecan Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+975990,PingoDoce,Gelado de Caramelo Salgado,Olá,"0.9 L | 3,32 €/L",Tubs
+976000,PingoDoce,Gelado com Molho de Frutos Exóticos,Olá,"0.9 L | 3,32 €/L",Tubs
+976223,PingoDoce,Gelado Tarte de Limão Les Desserts,Carte D'Or,"0.825 L | 3,99 €/L",Tubs
+976502,PingoDoce,Gelado Cookie Dough,Pingo Doce,"0.5 L | 6,98 €/L",Pints
+976503,PingoDoce,Chocolate Belga,,,Pints
+976505,PingoDoce,Gelado Meios Cocos,Pingo Doce,"0.29 L | 9,62 €/L",Other
+976506,PingoDoce,Gelado Crocante Avelã,Pingo Doce,"0.3 L | 10,97 €/L",Sticks
+976508,PingoDoce,Gelado Chocolate Clássico,Magnum,"0.3 L | 9,97 €/L",Sticks
+976862,PingoDoce,Gelado Majestic Cookies,Pingo Doce,"0.6 L | 6,48 €/L",Sticks
+976863,PingoDoce,Gelado Majestic Amêndoas,Pingo Doce,"0.72 L | 4,99 €/L",Sticks
+976864,PingoDoce,Gelado Majestic Clássico,Pingo Doce,"0.72 L | 4,99 €/L",Sticks
+977862,PingoDoce,Gelado Tripla Delícia,Pingo Doce,"2 L | 1,65 €/L",Tubs
+977982,PingoDoce,Gelado Bombom Gold Caramel Billionaire,Magnum,"0.204 L | 19,56 €/L",Bites
+977983,PingoDoce,Gelado Bombom Caramelo Salgado e Amêndoas,Magnum,"0.204 L | 19,56 €/L",Bites
+977984,PingoDoce,Gelado Bombons de Chocolate Branco e Cookies,Magnum,"0.204 L | 29,36 €/L",Bites
+978195,PingoDoce,Sorbet Framboesa,Pingo Doce,"1 L | 3,69 €/L",Tubs
+985760,PingoDoce,Gelado Vegan Berries e Pistachio,Swee,"0.23 Kg | 29,52 €/Kg",Pints
+986748,PingoDoce,Gelado Double Cherry,Magnum,"0.255 L | 15,65 €/L",Sticks
+987203,PingoDoce,Gelados Mini Chocolate Branco e Amêndoa,Magnum,"0.33 Kg | 18,15 €/Kg",Sticks
+988000,PingoDoce,Gelado Double Hazelnut,Magnum,"0.255 L | 15,65 €/L",Sticks
+988220,PingoDoce,Gelado Mini Chocolate Clássico,Magnum,"0.33 L | 12,09 €/L",Sticks
+988747,PingoDoce,Gelado Fruit Mix,Pingo Doce,"0.34 L | 7,62 €/L",Sticks
+988835,PingoDoce,Gelado After Dinner,Magnum,"0.28 L | 26,75 €/L",Bites
+988837,PingoDoce,Gelado Sticks Filipinos,Olá,"0.248 L | 16,09 €/L",Sticks
+988839,PingoDoce,Gelado Twister Mini Ananás,Olá,"0.3 L | 13,3 €/L",
+988840,PingoDoce,Gelado Cone Max Manga e Baunilha,Cornetto,"0.36 L | 16,64 €/L",Cones
+988841,PingoDoce,Gelado Chocolate e Amêndoa,Magnum,"0.8 L | 7,49 €/L",Sticks
+988987,PingoDoce,Mini Sandwich Avelã,,,Sandwich
+990204,PingoDoce,Gelado Baunilha de Madagáscar,Carte D'Or,"1.3 L | 2,3 €/L",Tubs
+990451,PingoDoce,Gelado Mini Sandwich de Nata,Pingo Doce,"0.6 L | 3,98 €/L",Sandwich
+990452,PingoDoce,Gelado Geláticos,Pingo Doce,"0.342 L | 8,16 €/L",Sticks
+990499,PingoDoce,Gelado Mochi de Coco,Pingo Doce,"0.14 L | 21,36 €/L",Bites
+990500,PingoDoce,Gelado Cone Perna de Pau,Olá,"0.36 L | 8,31 €/L",Cones
+990584,PingoDoce,Gelado Caramel & Nuts,Magnum,"0.256 L | 26,13 €/L",Bars
+990615,PingoDoce,Gelado Cone Limão,Pingo Doce,"0.72 L | 4,15 €/L",Cones
+990978,PingoDoce,Gelado de Pistáchio e Baunilha,Pingo Doce,"0.95 L | 3,88 €/L",Tubs
+990979,PingoDoce,Gelado 3 Sabores,Pingo Doce,"1 L | 2,79 €/L",Tubs
+991269,PingoDoce,Gelado Peanut Butter Cup,Pingo Doce,"0.5 L | 6,98 €/L",Pints
+991270,PingoDoce,Framboesas Cobertas de Chocolate de Leite,Pingo Doce,"0.1 Kg | 26,9 €/Kg",Bites
+991271,PingoDoce,Framboesas Cobertas de Chocolate Negro,Pingo Doce,"0.1 Kg | 26,9 €/Kg",Bites
+991385,PingoDoce,Gelado Tarte de Limão,Pingo Doce,"0.5 L | 6,98 €/L",Pints
+991498,PingoDoce,Gelado Majestic Pistáchio,Pingo Doce,"0.4 L | 8,73 €/L",Sticks
+991579,PingoDoce,Gelado Vegan de Baunilha com Cookie,Swee,"0.24 Kg | 28,29 €/Kg",Pints
+992086,PingoDoce,Gelado de Café Caramel Latte,Pingo Doce,"0.95 L | 3,04 €/L",Tubs
+992368,PingoDoce,Gelados Mini Cones de Chocolate e Morango,Pingo Doce,"0.336 L | 8,9 €/L",Cones
+992498,PingoDoce,Gelado Majestic Chocolate Branco e Amêndoa,Pingo Doce,"0.72 L | 5,4 €/L",Sticks
+992500,PingoDoce,Gelado Vegan Caramelo e Brownie,Swee,"0.23 Kg | 29,52 €/Kg",Pints
+992711,PingoDoce,Gelado Vegan de Manga e Red Velvet,Swee,"0.24 Kg | 28,29 €/Kg",Pints
+993098,PingoDoce,Morangos Cobertos de Chocolate,itFruit,"0.11 Kg | 24,45 €/Kg",Bites
+993243,PingoDoce,Crepes Doces,Pingo Doce,"1 Kg | 3,99 €/Kg",Other
+993513,PingoDoce,Gelado Ben & Jerry's Non Dairy Bohemian Rasperry,Ben & Jerry's,"0.465 L | 8,58 €/L",
+993759,PingoDoce,Gelado Romântica Original,Carte D'Or,"1 L | 9,99 €/L",
+998878,PingoDoce,Cookies Congeladas,Pingo Doce,"0.54 Kg | 7,2 €/Kg",Other
+999836,PingoDoce,Massa de Pastel de Feira,Duforno,"0.75 Grm | 11,99 €/Grm",
