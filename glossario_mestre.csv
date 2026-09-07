@@ -157,7 +157,7 @@ PID,Retalhista,Nome,Marca,Marca_Padronizada,Quantidade,Formato,Formato_Origem
 1009244,PingoDoce,Gelado Mini Barra,Reeses,Reeses,"0.302 L | 18,18 €/L",Bites,Auto (categoria_combinada+nome)
 1009242,PingoDoce,Gelado de Pistáchio,Carte D'Or,Carte D'Or,"0.825 L | 7,26 €/L",,
 1002631,PingoDoce,Gelado Sweet Mango Memories,Ben & Jerry's,Ben & Jerry's,"0.465 L | 15,03 €/L",Pints,Manual
-1009121,PingoDoce,Gelados Haribo Push Up,Olá,Olá,"0.34 L | 14,68 €/L",,
+1009121,PingoDoce,Gelados Haribo Push Up,Olá,Olá,"0.34 L | 14,68 €/L",Sticks,Auto (categoria_site)
 1009026,PingoDoce,Gelado Truficone,La Menorquina,La Menorquina,"0.26 Kg | 19,19 €/Kg",Cones,Auto (categoria_site)
 962383,PingoDoce,Gelado Pirulitos,Pingo Doce,Pingo Doce,"0.368 L | 5,41 €/L",Sticks,Manual
 1002630,PingoDoce,Gelado de Chocolate e Baunilha,Carte D'Or,Carte D'Or,"1.7 L | 3,52 €/L",Tubs,Manual
