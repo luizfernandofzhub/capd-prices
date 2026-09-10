@@ -5,7 +5,11 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
 from io import BytesIO
-from collections import Counter as _Counter
+from collections import Counter as _Counter, defaultdict as _defaultdict
+import re as _re
+import unicodedata as _unicodedata
+import hashlib
+from rapidfuzz import fuzz as _fuzz
 
 st.set_page_config(
     page_title="Monitoramento de Preços | IceCream Portugal",
@@ -13,8 +17,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-_LAST_UPDATE = "29/Maio/2026"
 
 st.markdown("""
 <style>
@@ -63,6 +65,27 @@ h1, h2, h3 { font-family: 'DM Serif Display', serif; }
 .pill-high { background:#fdf2f8; color:#9d174d; border:1px solid #f9a8d4; padding:2px 9px; border-radius:20px; font-size:.7rem; font-weight:700; display:inline-block; }
 .pill-low  { background:#fffbeb; color:#92400e; border:1px solid #fcd34d; padding:2px 9px; border-radius:20px; font-size:.7rem; font-weight:700; display:inline-block; }
 .pill-both { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; padding:2px 9px; border-radius:20px; font-size:.7rem; font-weight:700; display:inline-block; }
+
+/* ── Sidebar collapse/expand control — fixed contrast, not only on hover ──
+   Confirmed by inspecting the real rendered DOM: the icon itself is a
+   Material Symbols ligature inside a [data-testid="stIconMaterial"] span,
+   not an <svg>, so it needs a `color` override rather than `fill`. Two
+   different testids cover the expanded-sidebar button and the
+   collapsed-sidebar (re-expand) button. */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stExpandSidebarButton"] {
+    background: #1a1a1a !important;
+    border-radius: 6px !important;
+    opacity: 1 !important;
+}
+[data-testid="stSidebarCollapseButton"] button [data-testid="stIconMaterial"],
+[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
+    color: #f7f5f0 !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stExpandSidebarButton"]:hover {
+    background: #333 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,6 +95,53 @@ RETAILER_ORDER  = ["Continente","PingoDoce","Auchan"]
 def badge(retailer):
     color = RETAILER_COLORS.get(retailer,"#666")
     return f'<span class="retailer-badge" style="background:{color}22;color:{color}">{retailer}</span>'
+
+# ── Weekly collapse (Dia -> Semana) ─────────────────────────────────────────────
+# Scraping runs daily (Mon-Fri) via Task Scheduler, but every analysis in this
+# app only ever considers one reading per week — the week's minimum price.
+# Dia_para_Weeks.csv (Dia;Semana, e.g. '37´26') maps each calendar day to its
+# week label; load_data() uses it to collapse daily readings down to one row
+# per PID+Retalhista+Semana (the row with the lowest Preco that week).
+_WEEK_LABEL_RE        = _re.compile(r"^W(\d{1,2})´(\d{2})$")
+_WEEK_LABEL_NO_SEP_RE  = _re.compile(r"^W(\d{1,3})(\d{2})$")  # repairs a missing ´ separator
+
+def _normalize_week_label(raw):
+    """Normalise a week label from Dia_para_Weeks.csv. Handles the expected
+    'W<semana>´<aa>' format and repairs the occasional typo where the ´
+    separator is missing (e.g. 'W1025' -> 'W10´25' — the last two digits are
+    always the 2-digit year)."""
+    s = str(raw).strip()
+    if _WEEK_LABEL_RE.match(s):
+        return s
+    m = _WEEK_LABEL_NO_SEP_RE.match(s)
+    if m:
+        return f"W{m.group(1)}´{m.group(2)}"
+    return s
+
+
+@st.cache_data(ttl=300)
+def load_dia_para_weeks():
+    """Load the Dia -> Semana mapping from Dia_para_Weeks.csv.
+    Returns a dict {datetime.date: week_label_str}, e.g. {date(2026,9,10):
+    "W37´26"}. Returns an empty dict (graceful no-op — load_data() then
+    skips the weekly collapse) if the file can't be found or parsed.
+    """
+    for fname in ["Dia_para_Weeks.csv", "Dia para Weeks.csv"]:
+        for enc in ["cp1252", "latin-1"]:
+            try:
+                df_w = pd.read_csv(fname, sep=";", encoding=enc, header=0)
+            except Exception:
+                continue
+            if df_w.shape[1] < 2:
+                continue
+            df_w = df_w.iloc[:, :2]
+            df_w.columns = ["Dia", "Semana"]
+            df_w["Dia"] = pd.to_datetime(df_w["Dia"], format="%d/%m/%Y", errors="coerce").dt.date
+            df_w = df_w.dropna(subset=["Dia"])
+            df_w["Semana"] = df_w["Semana"].apply(_normalize_week_label)
+            return dict(zip(df_w["Dia"], df_w["Semana"]))
+    return {}
+
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
@@ -102,6 +172,22 @@ def load_data(source):
     df_all["Data"] = pd.to_datetime(df_all["Data"])
     df_all["PID"] = df_all["PID"].astype(str)  # normalise PID type
     df_all = df_all.sort_values("Data").drop_duplicates(subset=["PID","Retalhista","Data"], keep="last")
+
+    # ── Weekly collapse: one row per PID+Retalhista+Semana, keeping the
+    # reading with the lowest Preco that week. A date missing from the
+    # mapping falls back to being its own single-day "week" rather than
+    # being silently dropped, so nothing disappears if the mapping file
+    # doesn't yet cover a given date.
+    week_map = load_dia_para_weeks()
+    if week_map:
+        df_all["Semana"] = df_all["Data"].dt.date.map(week_map)
+        df_all["Semana"] = df_all["Semana"].fillna("D_" + df_all["Data"].dt.strftime("%Y-%m-%d"))
+        idx_min = df_all.groupby(["PID","Retalhista","Semana"])["Preco"].idxmin()
+        df_all = df_all.loc[idx_min].reset_index(drop=True)
+        df_all = df_all.sort_values("Data").reset_index(drop=True)
+    else:
+        df_all["Semana"] = None
+
     return df_all
 
 import base64, os
@@ -134,38 +220,21 @@ def retailer_header(ret, count_html=""):
         "</div>"
     )
 
-FORMATO_OPTIONS = ["Bars","Bites","Bites - PromoPack","Cakes","Cones","Cups",
-                   "Frozen Fruits","Other","Pints","Pints - PromoPack",
-                   "Pots","Sandwich","Sticks","Tubs"]
-
 @st.cache_data(ttl=60)
 def load_glossario_mestre():
     """Load the master glossary from glossario_mestre.csv.
     Returns a DataFrame indexed by PID+Retalhista with:
-      - Marca_Padronizada: standardised brand name
-      - Formato: product format (Pints, Sticks, etc.)
-      - Grupo_ID: cross-retailer equivalence group
-      - Nome_Padronizado: canonical product name
+      - Formato: product format (Pints, Sticks, etc.) — manually curated.
+    (Marca_Padronizada / Grupo_ID / Nome_Padronizado are no longer used —
+    replaced by the automatic Nome Agregador / Marca Agregadora engine.)
     Falls back gracefully to legacy files if glossario_mestre.csv is absent.
     """
-    _empty = pd.DataFrame(columns=["PID","Retalhista","Nome","Marca",
-                                    "Marca_Padronizada","Quantidade","Formato",
-                                    "Grupo_ID","Nome_Padronizado"])
+    _empty = pd.DataFrame(columns=["PID","Retalhista","Nome","Marca","Quantidade","Formato"])
     # Priority order: new master > legacy glossario_retalhistas > legacy glossario_formato
     for fname in ["glossario_mestre.csv", "glossario_retalhistas.csv", "glossario_formato.csv"]:
         try:
             df_gl = pd.read_csv(fname, encoding="utf-8-sig")
             df_gl["PID"] = df_gl["PID"].astype(str)
-            # Normalise Marca Padronizada column name:
-            # accept "Marca Padronizada" (space, legacy) → rename to "Marca_Padronizada" (underscore, standard)
-            if "Marca Padronizada" in df_gl.columns:
-                df_gl = df_gl.rename(columns={"Marca Padronizada": "Marca_Padronizada"})
-            if "Marca_Padronizada" not in df_gl.columns:
-                df_gl["Marca_Padronizada"] = df_gl.get("Marca", None)
-            # Ensure optional columns exist
-            for col in ("Grupo_ID", "Nome_Padronizado"):
-                if col not in df_gl.columns:
-                    df_gl[col] = ""
             if "Formato" not in df_gl.columns:
                 df_gl["Formato"] = None
             return df_gl
@@ -173,139 +242,11 @@ def load_glossario_mestre():
             continue
     return _empty
 
-def import_glossario_csv(uploaded_csv):
-    """Legacy import — kept for the Classificar SKUs tab upload widget."""
-    try:
-        df_csv = pd.read_csv(uploaded_csv)
-        df_csv["PID"] = df_csv["PID"].astype(str)
-        imported = df_csv["Formato"].notna().sum() if "Formato" in df_csv.columns else 0
-        return imported
-    except Exception as e:
-        return f"Erro: {e}"
 
-
-# ── Classification logic ───────────────────────────────────────────────────────
-def classify_sku(price_series_with_dates, outlier_min_count=3, outlier_min_pct=5.0):
-    """Accepts list of (date, price) tuples sorted chronologically."""
-    if not price_series_with_dates:
-        return {"tipo":"Sem dados","preco_high":None,"preco_low":None,"prof_promo":0.0,"alerta":None}
-
-    dated = [(d, float(p)) for d, p in price_series_with_dates if pd.notna(p)]
-    if not dated:
-        return {"tipo":"Sem dados","preco_high":None,"preco_low":None,"prof_promo":0.0,"alerta":None}
-
-    prices = [p for _, p in dated]
-    n = len(prices)
-    cnt = _Counter(prices)
-    unique_prices = sorted(cnt.keys())
-
-    most_common_count = cnt.most_common(1)[0][1]
-    if most_common_count/n >= 0.90 or len(unique_prices) == 1:
-        return {"tipo":"Preço Único","preco_high":max(prices),"preco_low":None,"prof_promo":0.0,"alerta":None}
-
-    # Top-2 most frequent = established Baseline / Low pair
-    top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
-    est_baseline = max(top2)
-    est_low      = min(top2)
-    known = {est_baseline, est_low}
-    prof = (1 - est_low/est_baseline)*100 if est_baseline > 0 else 0.0
-
-    # First-seen date for each price (chronological direction)
-    first_seen_date = {}
-    for date, price in dated:
-        if price not in first_seen_date:
-            first_seen_date[price] = date
-    bl_first  = first_seen_date.get(est_baseline)
-    low_first = first_seen_date.get(est_low)
-
-    alerts = []
-    for np_ in unique_prices:
-        if np_ in known: continue
-        cnt_p = cnt[np_]
-        pct_p = cnt_p/n*100
-        if cnt_p < outlier_min_count or pct_p < outlier_min_pct: continue
-
-        np_first = first_seen_date.get(np_)
-        dist_b = abs(np_ - est_baseline)
-        dist_l = abs(np_ - est_low)
-
-        if np_ > est_baseline:
-            if np_first < bl_first:
-                kind="Novo Baseline ↑"; old_v=np_; new_v=est_baseline
-                new_prof=(1-est_low/est_baseline)*100
-            else:
-                kind="Novo Baseline ↑"; old_v=est_baseline; new_v=np_
-                new_prof=(1-est_low/np_)*100
-        elif np_ < est_low:
-            if np_first < low_first:
-                kind="Novo Low ↓"; old_v=np_; new_v=est_low
-                new_prof=(1-est_low/est_baseline)*100
-            else:
-                kind="Novo Low ↓"; old_v=est_low; new_v=np_
-                new_prof=(1-np_/est_baseline)*100
-        elif dist_l <= dist_b:
-            if np_first < low_first:
-                kind="Novo Low ↓"; old_v=np_; new_v=est_low
-                new_prof=(1-est_low/est_baseline)*100
-            else:
-                kind="Novo Low ↓"; old_v=est_low; new_v=np_
-                new_prof=(1-np_/est_baseline)*100
-        else:
-            if np_first < bl_first:
-                kind="Novo Baseline ↑"; old_v=np_; new_v=est_baseline
-                new_prof=(1-est_low/est_baseline)*100
-            else:
-                kind="Novo Baseline ↑"; old_v=est_baseline; new_v=np_
-                new_prof=(1-est_low/np_)*100
-
-        alerts.append({"tipo":kind,"preco_anterior":round(old_v,2),"preco_novo":round(new_v,2),
-                        "prof_anterior":round(prof,1),"prof_nova":round(new_prof,1),
-                        "n_leituras":cnt_p,"pct_leituras":round(pct_p,1)})
-
-    return {"tipo":"High-Low","preco_high":est_baseline,"preco_low":est_low,
-            "prof_promo":round(prof,1),"alerta":alerts if alerts else None}
-
-@st.cache_data(ttl=300)
-def build_classifications(df_input):
-    records = []
-    for (pid, ret), grp in df_input.groupby(["PID","Retalhista"]):
-        grp = grp.sort_values("Data")
-        cls = classify_sku(list(zip(grp["Data"].tolist(), grp["Preco"].tolist())))
-        m = grp.iloc[0]
-        pid = str(pid)  # normalise to str
-        has_bl  = cls["alerta"] and any("Baseline" in a["tipo"] for a in cls["alerta"])
-        has_low = cls["alerta"] and any("Low"      in a["tipo"] for a in cls["alerta"])
-        alert_label = None
-        if has_bl and has_low: alert_label = "NB+NL"
-        elif has_bl:           alert_label = "NB"
-        elif has_low:          alert_label = "NL"
-        fmt = m.get("Formato") if hasattr(m, "get") else (m["Formato"] if "Formato" in m.index else None)
-        records.append({
-            "PID":m["PID"],"Retalhista":ret,"Nome":m["Nome"],"Marca":m["Marca"],
-            "Quantidade":m["Quantidade"],"Formato":fmt,"Tipo_Preco":cls["tipo"],
-            "Preco_High":cls["preco_high"],"Preco_Low":cls["preco_low"],
-            "Prof_Promo":cls["prof_promo"],"Alertas":cls["alerta"],
-            "Alert_Label":alert_label,
-        })
-    return pd.DataFrame(records)
-
-# ── Sidebar ────────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ⚙️ Configuração")
-    st.markdown("---")
-    uploaded = st.file_uploader("📂 Carregar ficheiro Excel", type=["xlsx"])
-    st.markdown("---")
-    st.markdown("**Fonte de dados activa:**")
-    if uploaded:
-        data_source = BytesIO(uploaded.read()); st.success("✅ Ficheiro carregado")
-    else:
-        data_source = "precos_CAPD.xlsx"; st.info("Usando ficheiro de demonstração")
-    st.markdown("---")
-    st.markdown("**Retalhistas**")
-    retailers_sel = st.multiselect("Filtrar por retalhista",["Continente","Auchan","PingoDoce"],
-                                    default=["Continente","Auchan","PingoDoce"])
-    st.markdown("---")
-    st.markdown("**Período de análise**")
+# ── Fixed config (no user-facing controls: file, retailers and date range are
+#    always the full dataset) ──────────────────────────────────────────────────
+data_source   = "precos_CAPD.xlsx"
+retailers_sel = ["Continente", "Auchan", "PingoDoce"]
 
 try:
     df = load_data(data_source)
@@ -318,115 +259,652 @@ df = df[df["Retalhista"].isin(retailers_sel)]
 min_date = df["Data"].min().date()
 max_date = df["Data"].max().date()
 
-with st.sidebar:
-    date_range = st.date_input("Intervalo de datas", value=(min_date,max_date),
-                                min_value=min_date, max_value=max_date)
-    d_start, d_end = (date_range[0], date_range[1]) if len(date_range)==2 else (min_date, max_date)
-    st.markdown("---")
-
-df_period = df[(df["Data"].dt.date >= d_start) & (df["Data"].dt.date <= d_end)]
-sku_cls   = build_classifications(df)
-sku_cls["PID"] = sku_cls["PID"].astype(str)  # normalise PID type throughout
+# (Sidebar navigation now built with st.navigation/st.Page below the data
+#  load — see the bottom of this file. No custom CSS needed: Streamlit
+#  renders and themes this menu itself.)
 
 # ── Load master glossary and enrich df ───────────────────────────────────────
 # Single source of truth: glossario_mestre.csv
-# Contains: Marca_Padronizada, Formato, Grupo_ID, Nome_Padronizado for all SKUs.
+# Contains: Formato for all SKUs (manually curated — kept as-is), and
+# Marca_Padronizada (manually curated — used for the Histórico de Preços tab's
+# brand filter, to avoid spelling-variant duplicates like "Ben & Jerry's" /
+# "BEN & JERRY'S" / "Ben & Jerrys" all showing up as separate brands).
+# Grupo_ID / Nome_Padronizado are still NOT used: cross-retailer product
+# matching is handled by the automatic Nome Agregador / Marca Agregadora
+# engine below, which doesn't require manual glossary upkeep as new SKUs
+# appear.
 df_gl_full = load_glossario_mestre()
 df_gl_full["PID"] = df_gl_full["PID"].astype(str)
 
-# Build a clean lookup table indexed by PID+Retalhista
-_gl_idx = df_gl_full.set_index(["PID","Retalhista"])
-
-# Enrich main df with Marca_Padronizada and Formato from glossary
+# Enrich main df with Formato + Marca_Padronizada from glossary
 df["PID"] = df["PID"].astype(str)
-for col in ("Marca_Padronizada", "Formato"):
-    if col in df.columns:
-        df = df.drop(columns=[col])
+if "Formato" in df.columns:
+    df = df.drop(columns=["Formato"])
+
+_gl_cols = ["PID","Retalhista","Formato"]
+if "Marca_Padronizada" in df_gl_full.columns:
+    _gl_cols.append("Marca_Padronizada")
 
 df = df.merge(
-    df_gl_full[["PID","Retalhista","Marca_Padronizada","Formato"]].drop_duplicates(),
+    df_gl_full[_gl_cols].drop_duplicates(subset=["PID","Retalhista"]),
     on=["PID","Retalhista"], how="left"
 )
-# Fallback: any SKU not in glossary gets raw Marca as Marca_Padronizada
-df["Marca_Padronizada"] = df["Marca_Padronizada"].fillna(df["Marca"])
+
+# Marca_Padronizada: fallback to the raw Marca for any SKU not (yet) in the
+# glossary, then apply small corrections on top of the curated column
+# (case-insensitively, since the curation itself has a couple of leftover
+# case-variant gaps — e.g. "FERRERO ROCHER" was never folded into the
+# Title-Case "Ferrero Rocher" used everywhere else):
+#  - "Ferrero"/"Ferrero Rocher" (any case) folded into "Ferrero" (same
+#    brand family)
+#  - "Carte DOr" (missing apostrophe) folded into "Carte D'Or"
+if "Marca_Padronizada" not in df.columns:
+    df["Marca_Padronizada"] = df["Marca"]
+else:
+    df["Marca_Padronizada"] = df["Marca_Padronizada"].fillna(df["Marca"])
+_MARCA_PADRONIZADA_OVERRIDES = {
+    "ferrero rocher": "Ferrero",
+    "carte dor": "Carte D'Or",
+}
+def _apply_marca_override(v):
+    if not isinstance(v, str):
+        return v
+    return _MARCA_PADRONIZADA_OVERRIDES.get(v.strip().lower(), v)
+df["Marca_Padronizada"] = df["Marca_Padronizada"].apply(_apply_marca_override)
+
+# Treat SKUs with a purely-numeric (garbage) raw Marca as noise: force them
+# unclassified (no Formato) so they're excluded wherever the app already
+# skips formatless SKUs (the matching engine, Produtos Novos, etc.) — e.g.
+# PID 4013230 "CUBOS GELO EM COPO 528 130G", where "528" ended up in the
+# Marca field instead of being a real brand.
+_numeric_marca_mask = df["Marca"].astype(str).str.fullmatch(r"\d+")
+df.loc[_numeric_marca_mask, "Formato"] = None
 
 # df_fmt_lookup: simple PID+Retalhista → Formato table (used by several tabs)
 df_fmt_lookup = df[["PID","Retalhista","Formato"]].drop_duplicates()
 
-# df_sku_list: one row per SKU with all metadata enriched
-df_sku_list = (df.sort_values("Data")
-               .drop_duplicates(subset=["PID","Retalhista"], keep="last")
-               [["PID","Retalhista","Nome","Marca","Marca_Padronizada","Quantidade","Formato"]]
-               .copy())
+# ═══════════════════════════════════════════════════════════════════════════
+# NOME AGREGADOR / MARCA AGREGADORA — automatic cross-retailer product
+# matching engine. Replaces the old manually-curated Marca_Padronizada /
+# Grupo_ID / Nome_Padronizado glossary fields.
+#
+# How it works (see project notes for full rationale):
+#   1. Own-brand (marca própria) SKUs are detected via retailer-name aliases
+#      and are NEVER matched across retailers — they always stay standalone.
+#   2. SKUs without a Formato are excluded from matching entirely.
+#   3. Candidates are compared only within the same Formato, with brand
+#      (normalised) and size (parsed to a common unit, with tolerance) as
+#      hard filters — only then is a fuzzy name-similarity score computed.
+#   4. Pairs scoring ≥ HIGH_THRESHOLD are auto-grouped into one cluster,
+#      sharing a single Nome Agregador / Marca Agregadora.
+#   5. Pairs scoring between LOW_THRESHOLD and HIGH_THRESHOLD are NOT
+#      grouped (each SKU stays standalone) but are surfaced in the "Notas"
+#      tab as an open question for manual review.
+#   6. Nothing is persisted — this recomputes in memory on every load.
+# ═══════════════════════════════════════════════════════════════════════════
 
-# df_sku_meta: alias kept for compatibility
-df_sku_meta = df_sku_list.copy()
+_RETAILER_BRAND_ALIASES = {
+    "Continente": {"continente"},
+    "Auchan":     {"auchan", "auchan collection"},
+    "PingoDoce":  {"pingo doce", "pingodoce"},
+}
+_GENERIC_BRAND_SUFFIXES = [" gelados", " ice cream", " icecream"]
+_PACK_WORDS = ["emb.", "embalagem", "un.", "unidades", "unidade", "multipack",
+               "minicups", "pack", "the",
+               "quantidade nao disponivel", "quantidade não disponível"]
+
+# Words Luiz reviewed and authorized (2026-09-09, CAPD_auditoria_palavras_matching.xlsx)
+# as SAFE TO IGNORE when comparing two product names across retailers — i.e. one
+# retailer's title including this word and another's omitting it does NOT mean
+# they're different products (confirmed case-by-case, e.g. "Memories" is a
+# truncated-title artifact, not a real naming difference). These are blanket-
+# stripped in _core_name, same as "Gelado"/"Tarte" always were.
+_SAFE_FILLER_WORDS = [
+    "1", "bem", "collection", "cone", "cream", "creamy", "de", "e", "gelada",
+    "geldo", "kids", "max", "memories", "pint", "roma", "sticks", "utopia",
+]
+_GENERIC_FILLER_WORDS = ["gelado", "gelados", "sobremesa", "sobremesas",
+                          "tarte", "tarte gelada"] + _SAFE_FILLER_WORDS
+
+# Words Luiz reviewed and marked SABOR — NUNCA IGNORAR in the same review: if
+# either of two product names has one of these and the other doesn't, they are
+# DIFFERENT products/variants, even when the text is otherwise near-identical
+# and would score high by pure edit distance (e.g. "Chocolate Clássico" vs
+# "Mini Chocolate Clássico" scores 87.8 on text alone — well above the 84
+# auto-merge line — even though Luiz confirmed "Mini" marks a genuinely
+# different, differently-priced multipack SKU, not the same product renamed).
+# Sub-brands sold under the Olá umbrella (Luiz confirmed 2026-09-09): kept as
+# INDEPENDENT brands (never collapsed into "Olá") for reporting/analysis, but
+# bridged with "Olá" for cross-retailer matching — see _brands_compatible and
+# _pick_canonical.
+_OLA_SUBBRANDS = {"calippo", "cornetto", "solero", "viennetta", "feast"}
+
+_NEVER_IGNORE_WORDS = {
+    "almond", "caramel", "cheesecake", "chocolate", "classico", "crackable",
+    "double", "frac", "mini", "nozes", "praline", "speculoos", "strawberry",
+    "white",
+}
+
+_UNIT_TO_G = {"ml": 1, "l": 1000, "g": 1, "kg": 1000}
+# Raw unit spellings actually seen in the scraped text that the previous
+# regex silently missed (confirmed against the live data: 2 159 Continente
+# readings write grams as "gr" — e.g. "emb. 300 gr (6 un)" — and 1 760
+# Continente readings write liters as "lt" — e.g. "emb. 1,3 lt"; 12 PingoDoce
+# readings use "Grm"). Missing these sent the parser straight to the bare
+# "N un" fallback (or to no size at all), which is the root cause of
+# Histórico rows that looked like duplicates of the same product at another
+# retailer purely because Continente's size was invisible to the parser.
+_UNIT_ALIASES = {
+    "ml": "ml",
+    "l": "l", "lt": "l", "litro": "l", "litros": "l",
+    "g": "g", "gr": "g", "grs": "g", "grm": "g", "grama": "g", "gramas": "g",
+    "kg": "kg",
+}
+_UNITS_PATTERN = "|".join(sorted(_UNIT_ALIASES.keys(), key=len, reverse=True))
+
+
+def _canon_unit(u):
+    """Map a raw unit spelling (ml/l/lt/g/gr/grm/kg/...) to its canonical
+    form (ml/l/g/kg) before any lookup — never invents a unit, just
+    recognizes the spelling variants actually present in the source data."""
+    return _UNIT_ALIASES.get(str(u).lower(), str(u).lower())
+
+
+_MULTIPACK_RE = _re.compile(rf"(\d+)\s*[xX]\s*(\d+[.,]?\d*)\s*({_UNITS_PATTERN})\b", _re.IGNORECASE)
+_SINGLE_QTY_RE = _re.compile(rf"(\d+[.,]?\d*)\s*({_UNITS_PATTERN})\b", _re.IGNORECASE)
+_PAREN_UN_RE = _re.compile(r"\((\d+)\s*un\)", _re.IGNORECASE)
+
+_AGG_HIGH_THRESHOLD = 84   # name-similarity score at/above which SKUs auto-group
+_AGG_LOW_THRESHOLD  = 60   # below this, not even shown as a Nota
+_AGG_SIZE_TOLERANCE = 0.15  # 15%
+
+# PT -> EN flavour synonyms, applied only inside _core_name for scoring/matching
+# purposes (never for the displayed Nome Agregador). Keys are post-_norm_text
+# (accent-stripped, lowercase) tokens.
+FLAVOR_SYNONYMS = {
+    "negro": "dark", "preto": "dark",
+    "branco": "white",
+    "amendoa": "almond", "amendoas": "almond",
+    "caramelo": "caramel",
+    "choco": "chocolate",   # common abbreviation seen in Auchan titles (e.g.
+                             # "CHOCO FUDGE BROWNIE") — same word, not a flavour
+    "salgado": "salted",
+    "morango": "strawberry",
+    "baunilha": "vanilla",
+    "cereja": "cherry",
+    "avela": "hazelnut",
+    "pistacio": "pistachio", "pistacho": "pistachio",
+    "leite": "milk",
+    "manga": "mango",
+    "framboesa": "raspberry",
+    "mel": "honey",
+    "coco": "coconut",
+    "canela": "cinnamon",
+    "limao": "lemon",
+    "manteiga": "butter",
+    "amendoim": "peanut",
+}
+
+# Leading filler/preposition stripping for canonical display names.
+_LEADING_FILLER_RE = _re.compile(r"^\s*(gelados?|tarte\s+gelada|tarte)\s+", _re.IGNORECASE)
+_LEADING_PREP_RE    = _re.compile(r"^\s*(de|do|da)\s+", _re.IGNORECASE)
+
+
+def _strip_accents(s):
+    if s is None:
+        return ""
+    nfkd = _unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in nfkd if not _unicodedata.combining(c))
+
+
+def _norm_text(s):
+    s = _strip_accents(s).lower().strip()
+    # Apostrophes are dropped entirely (not turned into a space) so that a
+    # possessive/contraction normalizes the same whether or not the source
+    # kept the apostrophe — confirmed against real data: Continente's raw
+    # Marca field writes "Ben & Jerrys" (no apostrophe) while Auchan/
+    # PingoDoce write "Ben & Jerry's". Turning "'" into a space produced
+    # "jerry s" (2 tokens) vs "jerrys" (1 token) — never equal — which
+    # silently blocked Continente's SKUs from matching either of the other
+    # two retailers in build_agregadores' brand-compatibility check, before
+    # the name-similarity score was even computed.
+    s = s.replace("'", "").replace("\u2019", "")
+    s = _re.sub(r"[^\w\s]", " ", s)
+    s = _re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _normalize_brand(marca):
+    m = _norm_text(marca)
+    for suf in _GENERIC_BRAND_SUFFIXES:
+        if m.endswith(suf.strip()):
+            m = m[: -len(suf.strip())].strip()
+    return m
+
+
+def _is_private_label(marca, retalhista):
+    m = _norm_text(marca)
+    aliases = _RETAILER_BRAND_ALIASES.get(retalhista, set())
+    return m in aliases
+
+
+def _parse_total_qty(nome, quantidade, retalhista):
+    """Return total pack quantity in a grams/ml-equivalent unit, or None."""
+    nome = str(nome or "")
+    quant = str(quantidade or "")
+    search_space = f"{nome} {quant}"
+
+    m = _MULTIPACK_RE.search(search_space)
+    if m:
+        mult = float(m.group(1))
+        val = float(m.group(2).replace(",", "."))
+        unit = _canon_unit(m.group(3))
+        return mult * val * _UNIT_TO_G.get(unit, 1)
+
+    if "|" in quant:
+        quant = quant.split("|")[0].strip()
+
+    single = _SINGLE_QTY_RE.search(quant)
+    if single:
+        val = float(single.group(1).replace(",", "."))
+        unit = _canon_unit(single.group(2))
+        return val * _UNIT_TO_G.get(unit, 1)
+
+    single2 = _SINGLE_QTY_RE.search(nome)
+    if single2:
+        val = float(single2.group(1).replace(",", "."))
+        unit = _canon_unit(single2.group(2))
+        return val * _UNIT_TO_G.get(unit, 1)
+
+    return None
+
+
+# Display unit for each raw unit token: ml/l -> "ml", g/kg -> "g" (always
+# whole numbers, always base units — per user decision).
+_QTY_DISPLAY_UNIT = {"ml": "ml", "l": "ml", "g": "g", "kg": "g"}
+_BARE_UN_RE = _re.compile(r"(\d+)\s*un\b", _re.IGNORECASE)
+
+def _format_qty_padronizada(nome, quantidade):
+    """Standardized display quantity for the Histórico de Preços table —
+    reuses the same parsing cascade as _parse_total_qty (including its
+    Nome-field fallback, which recovers the correct value even when the
+    scraped Quantidade is truncated for some Auchan SKUs, e.g. '41.8G' ->
+    '8G'), but keeps track of whether the unit is volume or weight so it can
+    be displayed correctly ('465 ml' / '300 g' — never mg, never L/Kg, never
+    decimals). Falls back to a bare unit count ('6 un') when no ml/g/l/kg
+    size is present anywhere; returns None when nothing at all is derivable
+    (never invents a size)."""
+    nome = str(nome or "")
+    quant = str(quantidade or "")
+    search_space = f"{nome} {quant}"
+
+    m = _MULTIPACK_RE.search(search_space)
+    if m:
+        mult = float(m.group(1))
+        val = float(m.group(2).replace(",", "."))
+        unit = _canon_unit(m.group(3))
+        total = mult * val * _UNIT_TO_G.get(unit, 1)
+        return f"{round(total)} {_QTY_DISPLAY_UNIT.get(unit,'ml')}"
+
+    q = quant
+    if "|" in q:
+        q = q.split("|")[0].strip()
+
+    single = _SINGLE_QTY_RE.search(q)
+    if single:
+        val = float(single.group(1).replace(",", "."))
+        unit = _canon_unit(single.group(2))
+        total = val * _UNIT_TO_G.get(unit, 1)
+        return f"{round(total)} {_QTY_DISPLAY_UNIT.get(unit,'ml')}"
+
+    single2 = _SINGLE_QTY_RE.search(nome)
+    if single2:
+        val = float(single2.group(1).replace(",", "."))
+        unit = _canon_unit(single2.group(2))
+        total = val * _UNIT_TO_G.get(unit, 1)
+        return f"{round(total)} {_QTY_DISPLAY_UNIT.get(unit,'ml')}"
+
+    un = _BARE_UN_RE.search(search_space)
+    if un:
+        return f"{un.group(1)} un"
+
+    return None
+
+
+# Retailer/brand marketing nicknames that don't literally describe the
+# flavour, found case-by-case during matching review and confirmed with
+# Luiz (2026-09-09: "vamos sempre ter que fazer inferências manuais com o
+# tempo — junte o que der"). Manual by nature; grows as more cases surface.
+# Applied as a phrase-level substitution before any other stripping.
+_MARKETING_ALIASES = {
+    "la pistache": "pistachio chocolate",   # Magnum (Auchan naming)
+    "euphoria": "pink lemonade",            # Magnum Mini (Auchan naming)
+    "churrifically churros y": "churros",   # Ben & Jerry's official flavour name
+    "tropical": "mango vanilla",            # Cornetto Max (Auchan naming) — broadest
+                                             # of these aliases; scoped only to this
+                                             # exact word, revisit if it ever collides
+                                             # with an unrelated "tropical" flavour.
+}
+
+
+def _core_name(nome, marca):
+    """Strip brand/quantity/packaging tokens from Nome, leaving the
+    descriptive 'core' of the product name for fuzzy matching."""
+    n = _norm_text(nome)
+    for phrase, repl in sorted(_MARKETING_ALIASES.items(), key=lambda x: -len(x[0])):
+        n = _re.sub(rf"\b{_re.escape(phrase)}\b", repl, n)
+    for w in _PACK_WORDS:
+        # Whole-word replace, not substring — a naive .replace() here turned
+        # "un" (from "un." after normalization) into a substring match that
+        # corrupted any word CONTAINING "un", e.g. "baunilha" -> "ba ilha".
+        # Confirmed against real data: this silently hurt the match score
+        # for every vanilla-flavoured product in the catalog.
+        n = _re.sub(rf"\b{_re.escape(_norm_text(w))}\b", " ", n)
+    n = _MULTIPACK_RE.sub(" ", n)
+    n = _SINGLE_QTY_RE.sub(" ", n)
+    n = _PAREN_UN_RE.sub(" ", n)
+    # "N un" without parentheses (e.g. "8UN", "4 UN") — the paren-only regex
+    # above missed these; confirmed against real data (rows with residual
+    # "8un"/"4un" tokens surviving into the matched text).
+    n = _re.sub(r"\b\d+\s*un\b", " ", n)
+    brand_token_list = _normalize_brand(marca).split()
+    brand_tokens = set(brand_token_list)
+    if _normalize_brand(marca) in ({"ola"} | _OLA_SUBBRANDS):
+        # Olá-family bridging (see _brands_compatible): a retailer may record
+        # this SKU's Marca as generic "Olá" while the sub-brand name (e.g.
+        # "Calippo") still appears in the Nome text, or vice-versa. Strip the
+        # whole family's tokens either way so both sides of a bridged pair
+        # end up with the SAME residual text regardless of which specific
+        # label that retailer happened to use in the Marca field.
+        brand_tokens |= {"ola"} | _OLA_SUBBRANDS
+    for tok in brand_tokens:
+        n = _re.sub(rf"\b{_re.escape(tok)}\b", " ", n)
+    if len(brand_token_list) >= 2:
+        # Retailers sometimes abbreviate a multi-word brand to its initials
+        # (confirmed: Auchan writes "B&J" for "Ben & Jerry's" — after
+        # normalisation "&" becomes a space, leaving "b j" as two adjacent
+        # single-letter tokens). Strip that derived-initials sequence too;
+        # requires the letters to appear ADJACENT as separate tokens, so
+        # this shouldn't false-trigger on unrelated short words.
+        initials = " ".join(w[0] for w in brand_token_list if w)
+        n = _re.sub(rf"\b{_re.escape(initials)}\b", " ", n)
+    for w in _GENERIC_FILLER_WORDS:
+        n = _re.sub(rf"\b{_re.escape(w)}\b", " ", n)
+    # translate PT flavour terms to EN so cross-language variants score as
+    # matches (scoring/matching only — never affects the displayed name)
+    n = " ".join(FLAVOR_SYNONYMS.get(tok, tok) for tok in n.split())
+    # PT plural/singular packaging-word variant seen in the data
+    # ("Bombons" vs "Bombom") — same word, not a flavour difference.
+    n = _re.sub(r"\bbombons\b", "bombom", n)
+    # Any standalone number left over at this point (e.g. "Pack 4", or a
+    # digit stranded by the "un"/pack stripping above) is packaging count,
+    # never a flavour identifier in this catalog — safe to drop.
+    n = _re.sub(r"\b\d{1,3}\b", " ", n)
+    n = _re.sub(r"\s+", " ", n).strip()
+    return n
+
+
+def _brands_compatible(marca_a, marca_b):
+    ba, bb = _normalize_brand(marca_a), _normalize_brand(marca_b)
+    if not ba or not bb:
+        return False
+    if ba == bb or ba in bb or bb in ba:
+        return True
+    # Sub-brands sold under the Olá umbrella (Luiz confirmed 2026-09-09):
+    # a retailer may label the SAME product "Olá" or with the sub-brand name
+    # directly (e.g. Calippo shows as "Olá" at one retailer, "Calippo" at
+    # another). Bridge sub-brand <-> generic "Olá" only — NOT sub-brand <->
+    # sub-brand (Calippo and Cornetto are different product families and
+    # must never cross-match each other).
+    if ba == "ola" and bb in _OLA_SUBBRANDS:
+        return True
+    if bb == "ola" and ba in _OLA_SUBBRANDS:
+        return True
+    return False
+
+
+def _sizes_compatible(qa, qb):
+    if not qa or not qb:
+        return True
+    return abs(qa - qb) / max(qa, qb) <= _AGG_SIZE_TOLERANCE
+
+
+def _name_score(nome_a, marca_a, nome_b, marca_b):
+    ca = _core_name(nome_a, marca_a)
+    cb = _core_name(nome_b, marca_b)
+    base = _fuzz.token_sort_ratio(ca, cb)
+    ta, tb = set(ca.split()), set(cb.split())
+    diff_words = ta ^ tb  # words present on only one side, post-stripping
+    if diff_words & _NEVER_IGNORE_WORDS:
+        # At least one authorized "never merge" word (Luiz's review) is part
+        # of what separates these two names. Text similarity alone is not
+        # trustworthy here — e.g. "Chocolate Clássico" vs "Mini Chocolate
+        # Clássico" scores 87.8 by edit distance alone (already above the 84
+        # auto-merge line) even though "Mini" marks a genuinely different,
+        # differently-priced multipack SKU. Cap below even the gray-zone
+        # floor: these are confirmed-different, not merely ambiguous, so
+        # they shouldn't clutter Notas as if they needed manual review.
+        return min(base, _AGG_LOW_THRESHOLD - 1)
+    return base
+
+
+def _pick_canonical(names_or_brands):
+    """Pick the 'nicest' display string from a list of variants: prefer
+    natural casing (not ALL CAPS) and, among those, the shortest (closer to
+    the bare product/brand name without redundant pack info).
+    Brand-specific override (Luiz, 2026-09-09): when a cluster mixes the
+    generic "Olá" label with one of its sub-brands (Calippo, Cornetto,
+    Solero, Viennetta, Feast — bridged for matching in _brands_compatible),
+    the sub-brand name wins even though "Olá" is shorter — the sub-brand is
+    the more specific, more useful label for analysis."""
+    vals = [v for v in names_or_brands if v and str(v).strip()]
+    if not vals:
+        return None
+    sub_brand_vals = [v for v in vals if _normalize_brand(v) in _OLA_SUBBRANDS]
+    if sub_brand_vals and any(_normalize_brand(v) == "ola" for v in vals):
+        vals = sub_brand_vals
+    non_caps = [v for v in vals if not str(v).isupper()]
+    pool = non_caps if non_caps else vals
+    return min(pool, key=len)
+
+
+def _pick_canonical_name(names, marca_agg):
+    """Pick the canonical display Nome Agregador, always prefixed with the
+    aggregated brand (e.g. 'Magnum Chocolate Clássico' instead of 'Gelado de
+    Chocolate Clássico'):
+      1. pick the 'nicest' variant the same way _pick_canonical does;
+      2. strip a leading 'Gelado(s) '/'Tarte Gelada '/'Tarte ' filler;
+      3. strip one remaining leading 'de '/'do '/'da ' preposition;
+      4. strip brand tokens already present in the middle of the text, so
+         the brand isn't duplicated once prefixed;
+      5. prefix with marca_agg.
+    """
+    vals = [v for v in names if v and str(v).strip()]
+    if not vals:
+        return None
+    non_caps = [v for v in vals if not str(v).isupper()]
+    pool = non_caps if non_caps else vals
+    base = str(min(pool, key=len)).strip()
+
+    core = _LEADING_FILLER_RE.sub("", base).strip()
+    core = _LEADING_PREP_RE.sub("", core).strip()
+    core_after_filler = core  # non-brand-stripped fallback
+
+    if marca_agg:
+        for tok in str(marca_agg).split():
+            core = _re.sub(rf"\b{_re.escape(tok)}\b", "", core, flags=_re.IGNORECASE)
+        core = _re.sub(r"\s+", " ", core).strip(" -")
+
+    if not core:
+        # If brand-token removal is what emptied it (e.g. the product name IS
+        # the brand name, like "Gelado Nutella"), the brand alone is the
+        # correct canonical name — don't reintroduce it and duplicate.
+        # Only fall back to the raw base if filler-stripping alone already
+        # left nothing (e.g. name was just "Gelado").
+        core = base if not core_after_filler else ""
+
+    return f"{marca_agg} {core}".strip() if marca_agg else core
+
+
+@st.cache_data(ttl=300)
+def build_agregadores(df_sku):
+    """Compute Nome Agregador / Marca Agregadora for every PID+Retalhista,
+    plus a list of gray-zone (ambiguous) pairs for the Notas tab.
+    df_sku must have one row per PID+Retalhista with Nome, Marca, Quantidade,
+    Retalhista, Formato.
+    """
+    recs = df_sku.to_dict("records")
+    for r in recs:
+        r["_key"] = f"{r['PID']}_{r['Retalhista']}"
+        r["_qty"] = _parse_total_qty(r["Nome"], r["Quantidade"], r["Retalhista"])
+        r["_priv"] = _is_private_label(r["Marca"], r["Retalhista"])
+
+    parent = {r["_key"]: r["_key"] for r in recs}
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    gray_notes = []
+
+    eligible = [r for r in recs if not r["_priv"] and pd.notna(r.get("Formato"))]
+    by_fmt = _defaultdict(list)
+    for r in eligible:
+        by_fmt[r["Formato"]].append(r)
+
+    for fmt, group in by_fmt.items():
+        n = len(group)
+        for i in range(n):
+            a = group[i]
+            for j in range(i + 1, n):
+                b = group[j]
+                if a["Retalhista"] == b["Retalhista"]:
+                    continue
+                if not _brands_compatible(a["Marca"], b["Marca"]):
+                    continue
+                if not _sizes_compatible(a["_qty"], b["_qty"]):
+                    continue
+                score = _name_score(a["Nome"], a["Marca"], b["Nome"], b["Marca"])
+                if score >= _AGG_HIGH_THRESHOLD:
+                    union(a["_key"], b["_key"])
+                elif score >= _AGG_LOW_THRESHOLD:
+                    gray_notes.append({
+                        "PID_A": a["PID"], "Retalhista_A": a["Retalhista"], "Nome_A": a["Nome"],
+                        "PID_B": b["PID"], "Retalhista_B": b["Retalhista"], "Nome_B": b["Nome"],
+                        "Score": round(score, 1),
+                    })
+
+    clusters = _defaultdict(list)
+    for r in recs:
+        clusters[find(r["_key"])].append(r)
+
+    out_rows = []
+    for root, members in clusters.items():
+        if len(members) > 1:
+            marca_agg = _pick_canonical([m["Marca"] for m in members])
+            nome_agg = _pick_canonical_name([m["Nome"] for m in members], marca_agg)
+        else:
+            nome_agg = members[0]["Nome"]
+            marca_agg = _normalize_brand(members[0]["Marca"]).title() if members[0]["Marca"] else members[0]["Marca"]
+            marca_agg = members[0]["Marca"]  # standalone: keep own brand as-is
+        for m in members:
+            out_rows.append({
+                "PID": m["PID"], "Retalhista": m["Retalhista"],
+                "Nome_Agregador": nome_agg, "Marca_Agregadora": marca_agg,
+            })
+
+    df_agg = pd.DataFrame(out_rows)
+    df_notas = pd.DataFrame(gray_notes).sort_values("Score", ascending=False) if gray_notes else pd.DataFrame(
+        columns=["PID_A","Retalhista_A","Nome_A","PID_B","Retalhista_B","Nome_B","Score"])
+    return df_agg, df_notas
+
+
+_df_sku_for_agg = df.sort_values("Data").drop_duplicates(subset=["PID","Retalhista"], keep="last")[
+    ["PID","Retalhista","Nome","Marca","Quantidade","Formato"]].copy()
+df_agregadores, df_notas_grouping = build_agregadores(_df_sku_for_agg)
+
+df = df.merge(df_agregadores, on=["PID","Retalhista"], how="left")
+df["Nome_Agregador"] = df["Nome_Agregador"].fillna(df["Nome"])
+df["Marca_Agregadora"] = df["Marca_Agregadora"].fillna(df["Marca"])
+
+# Quantidade_Padronizada: standardized pack size ("465 ml" / "300 g" / a bare
+# "6 un" when no size at all is derivable — never invented). Computed once
+# per unique (Nome, Quantidade) pair for speed, then mapped back onto df.
+_qty_pairs = df[["Nome","Quantidade"]].drop_duplicates()
+_qty_pairs["Quantidade_Padronizada"] = _qty_pairs.apply(
+    lambda r: _format_qty_padronizada(r["Nome"], r["Quantidade"]), axis=1)
+df = df.merge(_qty_pairs, on=["Nome","Quantidade"], how="left")
+
+
+def _harmonize_ml_over_g(df_all):
+    """De-duplication pass (per Luiz's decision): within the SAME aggregated
+    product as the Histórico de Preços tab groups it — Nome_Agregador +
+    Marca_Padronizada (the curated brand column that tab actually filters/
+    groups by, not Marca_Agregadora) — if one retailer's size is written in
+    grams and another retailer's size is written in ml but the NUMBER is
+    identical (e.g. Danonino '300 g' at Continente vs '300 ml' at Auchan/
+    PingoDoce — same pack, just weighed vs measured), relabel the gram
+    reading to ml so both collapse into a single Histórico row. ml is the
+    preferred/primary unit for this merge.
+    Does NOT touch a SKU that's in only one unit everywhere (all-g or
+    all-ml stays exactly as-is), and does NOT touch sizes that don't have a
+    matching number in the other unit (e.g. '456 g' with no '456 ml'
+    anywhere) — no value is invented or converted, only re-labelled when an
+    exact numeric match already exists in ml for that same product."""
+    q = df_all["Quantidade_Padronizada"]
+    is_gml = q.notna() & q.str.match(r"^\d+ (ml|g)$")
+    if not is_gml.any():
+        return df_all
+
+    sub = df_all.loc[is_gml, ["Nome_Agregador", "Marca_Padronizada", "Quantidade_Padronizada"]].copy()
+    sub["_val"] = sub["Quantidade_Padronizada"].str.extract(r"^(\d+)")[0].astype(int)
+    sub["_unit"] = sub["Quantidade_Padronizada"].str[-2:].str.strip()
+
+    units_per_key = (sub.drop_duplicates(["Nome_Agregador", "Marca_Padronizada", "_val", "_unit"])
+                         .groupby(["Nome_Agregador", "Marca_Padronizada", "_val"])["_unit"].agg(set))
+    swap_keys = set(units_per_key[units_per_key.apply(lambda s: {"ml", "g"} <= s)].index)
+    if not swap_keys:
+        return df_all
+
+    def _swap(row):
+        if row["_unit"] != "g":
+            return row["Quantidade_Padronizada"]
+        key = (row["Nome_Agregador"], row["Marca_Padronizada"], row["_val"])
+        return f'{row["_val"]} ml' if key in swap_keys else row["Quantidade_Padronizada"]
+
+    sub["_new"] = sub.apply(_swap, axis=1)
+    df_all.loc[is_gml, "Quantidade_Padronizada"] = sub["_new"].values
+    return df_all
+
+
+df = _harmonize_ml_over_g(df)
 
 # ── Header ─────────────────────────────────────────────────────────────────────
+_last_update_str = pd.Timestamp(max_date).strftime("%d/%m/%Y")
 st.markdown(f"""
 <div style='background:#1a1a1a;color:#d4d4d4;font-size:.78rem;text-align:center;
-            padding:.42rem 1rem;border-radius:6px;margin-bottom:.6rem;letter-spacing:.04em;'>
-  🕒 <strong>Última atualização em:</strong> {{_LAST_UPDATE}}
-</div>
-<h1 style='font-family:"DM Serif Display",serif;font-size:2.2rem;margin-bottom:.1rem;'>
-    Monitoramento de Preços | IceCream Portugal
-</h1>
-<p style='color:#888;font-size:.88rem;margin-bottom:.8rem;'>
-    Monitorização de preços · Continente · Auchan · Pingo Doce
-</p>""", unsafe_allow_html=True)
-
-# ── Tabs first ─────────────────────────────────────────────────────────────────
-# Minimal context managers — only the selected section renders
-class _AlwaysEnter:
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-
-class _NeverEnter:
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-
-tab1, tab2, tab4, tab5, tab6, tab_now = st.tabs([
-    "🆕 Produtos Novos",
-    "📣 Alerta de Mudança de Preço",
-    "📊 Montar Gráficos",
-    "🏷️ Classificar SKUs",
-    "🔬 Análise de Clusters (Beta)",
-    "🔍 Preço Agora",
-])
-
-# ── Slim KPI bar (below tabs) ───────────────────────────────────────────────────
-n_skus   = df_period[["PID","Retalhista"]].drop_duplicates().shape[0]
-n_brands = df_period["Marca"].nunique()
-n_obs    = len(df_period)
-n_days   = (d_end - d_start).days + 1
-n_alerts = sku_cls[sku_cls["Retalhista"].isin(retailers_sel)]["Alert_Label"].notna().sum()
-
-st.markdown(f"""
-<div class="kpi-bar">
-  <div class="kpi-item"><h4>SKUs monitorizados</h4><p>{n_skus}</p></div>
-  <div class="kpi-item"><h4>Marcas</h4><p>{n_brands}</p></div>
-  <div class="kpi-item"><h4>Leituras de preço</h4><p>{n_obs:,}</p></div>
-  <div class="kpi-item"><h4>Dias de histórico</h4><p>{n_days}</p></div>
-  <div class="kpi-item" style="border-color:#dc2626"><h4>SKUs com alerta</h4><p style="color:#dc2626">{n_alerts}</p></div>
-</div>
-""", unsafe_allow_html=True)
+            padding:.42rem 1rem;border-radius:6px;margin:3rem 0 .6rem;letter-spacing:.04em;'>
+  🕒 <strong>Última atualização em:</strong> {_last_update_str}
+</div>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 1 — NOVOS PRODUTOS
 # ═══════════════════════════════════════════════════════════════════
-with tab1:
+def page_novos():
     st.markdown('<div class="section-header">🆕 Produtos Novos</div>', unsafe_allow_html=True)
 
-    # ── Filter: days selector at top of tab (FIX 1) ──────────────────────────
-    t1a, t1b = st.columns([1, 3])
-    with t1a:
-        new_prod_days = st.slider("Primeiros dados nos últimos N dias",
-                                   min_value=3, max_value=90, value=7, step=1,
-                                   key="new_prod_days_slider")
-    with t1b:
-        st.markdown("")  # spacer
+    # ── Days selector (moved above the retailer boxes) ────────────────────────
+    new_prod_days = st.slider("Nos últimos X dias",
+                               min_value=3, max_value=90, value=7, step=1,
+                               key="new_prod_days_slider")
+    st.markdown(f"Produtos cuja **primeira leitura** ocorreu nos últimos **{new_prod_days} dias** (a contar de {max_date}).")
 
-    # ── FIX 5: exclude SKUs present on the very first date (launch SKUs) ─────
+    # ── Exclude SKUs present on the very first date (launch SKUs) ─────────────
     first_date_global = df["Data"].min()
     launch_skus = set(
         df[df["Data"] == first_date_global]
@@ -442,8 +920,27 @@ with tab1:
     first_seen_filtered = first_seen[~first_seen["key"].isin(launch_skus)].drop(columns=["key"])
 
     new_products = first_seen_filtered[first_seen_filtered["Primeira_Leitura"] >= cutoff].copy()
+    new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
 
-    st.markdown(f"Produtos cuja **primeira leitura** ocorreu nos últimos **{new_prod_days} dias** (a contar de {max_date}).")
+    # ── Only keep SKUs with a classified Formato — unclassified means the
+    # classification logic deliberately excluded them, so they shouldn't
+    # show up here at all ─────────────────────────────────────────────────
+    new_products["PID"] = new_products["PID"].astype(str)
+    new_products = new_products.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
+    new_products = new_products[new_products["Formato"].notna()]
+
+    # ── 3 retailer boxes: new products per retailer in this period ────────────
+    counts_by_ret = new_products["Retalhista"].value_counts()
+    boxes_html = ""
+    for ret in RETAILER_ORDER:
+        cnt = int(counts_by_ret.get(ret, 0))
+        color = RETAILER_COLORS.get(ret, "#1a1a1a")
+        logo = LOGOS.get(ret)
+        logo_html = (f'<img src="{logo}" style="height:20px;vertical-align:middle;margin-right:6px;">'
+                     if logo else "")
+        boxes_html += (f'<div class="kpi-item" style="border-color:{color}">'
+                       f'<h4>{logo_html}{ret}</h4><p>{cnt}</p></div>')
+    st.markdown(f'<div class="kpi-bar">{boxes_html}</div>', unsafe_allow_html=True)
 
     if new_products.empty:
         st.info(f"Nenhum produto novo nos últimos {new_prod_days} dias.")
@@ -455,19 +952,9 @@ with tab1:
         meta_cols = df.sort_values("Data").groupby(["PID","Retalhista"]).last()[["Nome","Marca","Quantidade"]].reset_index()
         price_stats = price_stats.merge(meta_cols, on=["PID","Retalhista"])
 
-        new_products["PID"] = new_products["PID"].astype(str)
         price_stats["PID"]  = price_stats["PID"].astype(str)
         new_products = new_products.merge(price_stats, on=["PID","Retalhista"])
-        new_products = new_products[new_products["Retalhista"].isin(retailers_sel)]
         new_products = new_products.sort_values(["Primeira_Leitura","Retalhista"], ascending=[False,True])
-        new_products = new_products.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-
-        st.markdown(f"**{len(new_products)} produto(s) encontrado(s)**")
-
-        # glossario is the _fmt_map dict (built from df_gl_full in tab5 block,
-        # but here we just need it for inline classification — use df_fmt_lookup)
-        glossario = {f"{r['PID']}_{r['Retalhista']}": r['Formato']
-                     for _, r in df_fmt_lookup[df_fmt_lookup['Formato'].notna()].iterrows()}
 
         for ret in RETAILER_ORDER:
             sub = new_products[new_products["Retalhista"]==ret].copy()
@@ -480,26 +967,7 @@ with tab1:
             # FIX 2: retailer header with logo
             st.markdown(retailer_header(ret, count_badge), unsafe_allow_html=True)
 
-            # FIX 4: inline Formato classification for unclassified SKUs
-            # Build display with selectbox for unclassified
-            display_rows = []
-            changed = False
-            for _, row in sub.iterrows():
-                key_id  = f"{row['PID']}_{ret}"
-                fmt_val = glossario.get(key_id)
-                if fmt_val is None:
-                    fmt_val = None  # will show selectbox
-                display_rows.append((row, key_id, fmt_val))
-
-            # Check if any need classification
-            needs_cls = any(fv is None for _, _, fv in display_rows)
-
-            # Build table for rows with Formato already classified
             d = sub[["PID","Nome","Marca","Quantidade","Formato","Preco_Atual","Preco_Min","Preco_Max","Primeira_Leitura"]].copy()
-            d["Formato"] = d.apply(
-                lambda r: glossario.get(f"{r['PID']}_{ret}", r["Formato"]), axis=1
-            )
-            d["Formato"] = d["Formato"].fillna("—")
             d.columns = ["ID","Nome","Marca","Quantidade","Formato","Preço Atual €","Mín €","Máx €","1ª Leitura"]
             d["Preço Atual €"] = d["Preço Atual €"].map("{:.2f}".format)
             d["Mín €"]         = d["Mín €"].map("{:.2f}".format)
@@ -507,638 +975,249 @@ with tab1:
             d["1ª Leitura"]    = d["1ª Leitura"].dt.strftime("%d/%m/%Y")
             st.dataframe(d, use_container_width=True, hide_index=True)
 
-            # FIX 4: show inline selectboxes for unclassified SKUs
-            unclassified = [(row, key_id) for row, key_id, fv in display_rows if fv is None and row["Formato"] == "—" or (fv is None and pd.isna(row.get("Formato","")))]
-            unclassified = [(row, key_id) for row, key_id, fv in display_rows
-                            if fv is None and (pd.isna(row.get("Formato")) or str(row.get("Formato","")) in ("nan","None","—",""))]
-            if unclassified:
-                st.markdown(f"**{len(unclassified)} SKU(s) sem Formato** — classifica abaixo:")
-                SEL_OPTS = ["— seleccionar —"] + FORMATO_OPTIONS
-                for row, key_id in unclassified:
-                    c_name, c_sel = st.columns([3,1])
-                    with c_name:
-                        st.markdown(f"<small style='color:#888'>{row['Nome']} · {row['Marca']}</small>",
-                                    unsafe_allow_html=True)
-                    with c_sel:
-                        chosen = st.selectbox("Formato", SEL_OPTS, key=f"t1_fmt_{key_id}",
-                                              label_visibility="collapsed")
-                        if chosen != "— seleccionar —":
-                            st.info("Para guardar a classificação, edita glossario_mestre.csv e faz upload.")
-
-    # ── FIX 5: Timeline chart excluding launch SKUs ───────────────────────────
-    if not first_seen_filtered.empty:
-        st.markdown("#### Histórico de entrada de novos produtos")
-        st.caption(f"Nota: SKUs presentes desde o início da base ({first_date_global.strftime('%d/%m/%Y')}) foram excluídos.")
-        tl = first_seen_filtered.copy()
-        tl["Semana"] = tl["Primeira_Leitura"].dt.to_period("W").dt.start_time
-        weekly = tl.groupby(["Semana","Retalhista"]).size().reset_index(name="Novos SKUs")
-        fig = px.bar(weekly, x="Semana", y="Novos SKUs", color="Retalhista",
-                     color_discrete_map=RETAILER_COLORS, barmode="group", template="plotly_white")
-        fig.update_layout(legend_title_text="", height=300, margin=dict(t=20,b=20))
-        st.plotly_chart(fig, use_container_width=True, key="chart_tab1_timeline")
-
 # ═══════════════════════════════════════════════════════════════════
-# TAB 2 — ALERTA DE MUDANÇA DE PREÇO
+# TAB 2 — HISTÓRICO DE PREÇOS
 # ═══════════════════════════════════════════════════════════════════
-with tab2:
-    st.markdown('<div class="section-header">📣 Alerta de Mudança de Preço</div>', unsafe_allow_html=True)
-
-    # ── Filters ──
-    # ── Row 1: main filters ───────────────────────────────────────────────────
-    r1a, r1b, r1c, r1d = st.columns([1, 1, 1, 1])
-    with r1a:
-        period2 = st.date_input("Período", value=(min_date, max_date),
-                                 min_value=min_date, max_value=max_date, key="period2")
-        p2_start, p2_end = (period2[0], period2[1]) if len(period2)==2 else (min_date, max_date)
-    with r1b:
-        ret2   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="ret2")
-    with r1c:
-        mp_opts2 = sorted(df["Marca_Padronizada"].dropna().unique()) if "Marca_Padronizada" in df.columns else sorted(df["Marca"].dropna().unique())
-        brand2 = st.multiselect("Marca", mp_opts2, key="brand2")
-    with r1d:
-        search2 = st.text_input("🔎 Nome", placeholder="ex: Ben & Jerry's", key="search2")
-
-    # ── Row 2: secondary filters (sem filtro tipo alerta) ─────────────────────
-    r2a, r2b, r2c, r2d = st.columns([1.4, 1, 1, 1])
-    with r2a:
-        st.markdown('<div style="background:#fff3f3;border:2px solid #dc2626;border-radius:10px;padding:.55rem .9rem;margin-top:.25rem;">', unsafe_allow_html=True)
-        only_alerts2 = st.checkbox("🚨 Apenas SKUs com alertas", value=True, key="chk_alerts2")
-        st.markdown("</div>", unsafe_allow_html=True)
-    with r2b:
-        tipo2  = st.multiselect("Estratégia", ["Preço Único","High-Low"], default=["Preço Único","High-Low"], key="tipo2")
-    with r2c:
-        fmt2_opts = sorted(df_fmt_lookup["Formato"].dropna().unique()) if (not df_fmt_lookup.empty and "Formato" in df_fmt_lookup.columns) else []
-        fmt2 = st.multiselect("Formato", fmt2_opts, key="fmt2")
-    with r2d:
-        st.caption("ℹ️ O período seleccionado afecta todos os cálculos de alertas e o gráfico.")
-
-    # ── Recompute classifications for selected period ─────────────────────────
-    df_period2 = df[(df["Data"].dt.date >= p2_start) & (df["Data"].dt.date <= p2_end)]
-    sku_cls2   = build_classifications(df_period2)
-    sku_cls2["PID"] = sku_cls2["PID"].astype(str)
-
-    # ── Filter ──
-    cf = sku_cls2[sku_cls2["Retalhista"].isin(ret2 or retailers_sel)].copy()
-    if brand2:
-        # cf comes from sku_cls which doesn't have Marca_Padronizada yet — add it from df
-        if "Marca_Padronizada" not in cf.columns:
-            _mp = df[["PID","Retalhista","Marca_Padronizada"]].drop_duplicates()
-            cf = cf.merge(_mp, on=["PID","Retalhista"], how="left")
-            cf["Marca_Padronizada"] = cf["Marca_Padronizada"].fillna(cf["Marca"])
-        cf = cf[cf["Marca_Padronizada"].isin(brand2)]
-    if tipo2:   cf = cf[cf["Tipo_Preco"].isin(tipo2)]
-    if search2: cf = cf[cf["Nome"].str.contains(search2, case=False, na=False)]
-    if only_alerts2: cf = cf[cf["Alert_Label"].notna()]
-    if fmt2 and "Formato" in cf.columns: cf = cf[cf["Formato"].isin(fmt2)]
-    cf["_ro"] = cf["Retalhista"].map({r:i for i,r in enumerate(RETAILER_ORDER)}).fillna(99)
-    cf = cf.sort_values(["_ro","Marca","Nome"]).drop(columns=["_ro"])
-    # Ensure Formato is in cf (always merge from static lookup)
-    cf["PID"] = cf["PID"].astype(str)
-    if "Formato" in cf.columns:
-        cf = cf.drop(columns=["Formato"])
-    cf = cf.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-
-    # ── Brand summary table ──
-    for ret in RETAILER_ORDER:
-        sub_ret = cf[cf["Retalhista"]==ret]
-        if sub_ret.empty: continue
-        st.markdown(retailer_header(ret), unsafe_allow_html=True)
-
-        # Brand summary
-        brand_summary = sub_ret.groupby("Marca").agg(
-            SKUs=("PID","count"),
-            Alertas=("Alert_Label", lambda x: x.notna().sum())
-        ).reset_index().sort_values("Alertas", ascending=False)
-        rows_html = ""
-        for _, br in brand_summary.iterrows():
-            alert_cell = f'<span style="color:#dc2626;font-weight:700">{int(br["Alertas"])}</span>' if br["Alertas"]>0 else "—"
-            rows_html += f'<tr><td>{br["Marca"]}</td><td>{int(br["SKUs"])}</td><td>{alert_cell}</td></tr>'
-        st.markdown(f"""
-<details><summary style="cursor:pointer;font-size:.85rem;color:#666;margin-bottom:.5rem;">
-▶ Resumo por marca ({len(brand_summary)} marcas)
-</summary>
-<table class="brand-table">
-<tr><th>Marca</th><th>SKUs</th><th>Com Alerta</th></tr>
-{rows_html}
-</table>
-</details>""", unsafe_allow_html=True)
-
-        # FIX 6: legend
-        st.markdown(
-            '<div style="font-size:.78rem;margin-bottom:.5rem;">' +
-            '<span style="color:#888">Alertas: </span>' +
-            '🟠 <span style="color:#ea580c;font-weight:600">Novo Baseline</span> &nbsp;&nbsp;' +
-            '🟣 <span style="color:#7c3aed;font-weight:600">Novo Low</span> &nbsp;&nbsp;' +
-            '🟠🟣 <span style="color:#888;font-weight:600">Novo Baseline + Novo Low</span> &nbsp;&nbsp;' +
-            '<span style="color:#888;margin-left:1rem">↑ superior ao anterior &nbsp; ↓ inferior ao anterior</span>' +
-            '</div>', unsafe_allow_html=True
-        )
-        # ── Main table + detail ──
-        sub_sorted = sub_ret.copy()
-        # Build display rows
-        rows_display = []
-        for _, row in sub_sorted.iterrows():
-            al = row["Alert_Label"]
-            if al == "NB+NL": alert_icon = "🟠🟣"
-            elif al == "NB":   alert_icon = "🟠"
-            elif al == "NL":   alert_icon = "🟣"
-            else:              alert_icon = ""
-            alert_pill = alert_icon  # keep compat
-
-            # Initialise alert lists — must exist for ALL SKU types (Preço Único or High-Low)
-            new_highs = []
-            new_lows  = []
-
-            if row["Tipo_Preco"] == "Preço Único":
-                high_str  = f'{row["Preco_High"]:.2f} €' if row["Preco_High"] else "—"
-                low_str   = "—"; prof_str = "—"
-                new_h_str = "—"; new_l_str = "—"; new_prof_str = "—"
-            else:
-                # FIX 6: no emoji icons, orange for baseline, purple for low
-                high_str  = f'{row["Preco_High"]:.2f} €' if row["Preco_High"] else "—"
-                low_str   = f'{row["Preco_Low"]:.2f} €'  if row["Preco_Low"]  else "—"
-                prof_str  = f'{row["Prof_Promo"]:.1f}%'  if row["Prof_Promo"] else "—"
-                als = row["Alertas"] or []
-                new_highs = [a for a in als if "Baseline" in a["tipo"]]
-                new_lows  = [a for a in als if "Low" in a["tipo"]]
-                # FIX 7: only new price; FIX 6: direction arrows
-                def fmt_new_bl(a):
-                    arrow = "↑" if a["preco_novo"] > a["preco_anterior"] else "↓"
-                    return f'{arrow} {a["preco_novo"]:.2f} €'
-                def fmt_new_low(a):
-                    arrow = "↑" if a["preco_novo"] > a["preco_anterior"] else "↓"
-                    return f'{arrow} {a["preco_novo"]:.2f} €'
-                new_h_str  = " | ".join(fmt_new_bl(a)  for a in new_highs) or "—"
-                new_l_str  = " | ".join(fmt_new_low(a) for a in new_lows)  or "—"
-                all_als = new_highs + new_lows
-                new_prof_str = f'{all_als[-1]["prof_nova"]:.1f}%' if all_als else "—"
-
-            _fv = row.get("Formato","") if hasattr(row,"get") else (row["Formato"] if "Formato" in row.index else "")
-            fmt_val = str(_fv) if (_fv is not None and str(_fv) not in ("nan","<NA>","None","")) else "—"
-            # FIX 4: new column order
-            # Track arrow direction for cell styling
-            nb_up  = any(a["preco_novo"] > a["preco_anterior"] for a in new_highs) if new_highs else None
-            nl_up  = any(a["preco_novo"] > a["preco_anterior"] for a in new_lows)  if new_lows  else None
-            rows_display.append({
-                "⚑":     alert_icon,
-                "Formato": fmt_val,
-                "Marca":   row["Marca"],
-                "Nome":    row["Nome"],
-                "Qtd":     row["Quantidade"],
-                "Baseline €": high_str,
-                "Low €":      low_str,
-                "Prof.%":     prof_str,
-                "Novo Baseline €": new_h_str,
-                "Novo Low €":      new_l_str,
-                "Nova Prof.%":     new_prof_str,
-                "ID":      row["PID"],
-                "_nb_up":  nb_up,   # True=up, False=down, None=no alert
-                "_nl_up":  nl_up,
-            })
-
-        df_display = pd.DataFrame(rows_display)
-
-        # ── Apply conditional cell styling via Styler ─────────────────────────
-        COLS_SHOW = ["⚑","Formato","Marca","Nome","Qtd",
-                     "Baseline €","Low €","Prof.%",
-                     "Novo Baseline €","Novo Low €","Nova Prof.%","ID"]
-        df_show = df_display[COLS_SHOW].copy()
-
-        def style_alert_cells(df_s):
-            styles = pd.DataFrame("", index=df_s.index, columns=df_s.columns)
-            for i in df_show.index:
-                nb_up = df_display.loc[i, "_nb_up"]
-                nl_up = df_display.loc[i, "_nl_up"]
-                if nb_up is True:
-                    styles.loc[i, "Novo Baseline €"] = (
-                        "background-color:rgba(34,197,94,0.18);"
-                        "color:#16a34a;font-weight:700")
-                elif nb_up is False:
-                    styles.loc[i, "Novo Baseline €"] = (
-                        "background-color:rgba(239,68,68,0.18);"
-                        "color:#dc2626;font-weight:700")
-                if nl_up is True:
-                    styles.loc[i, "Novo Low €"] = (
-                        "background-color:rgba(34,197,94,0.18);"
-                        "color:#16a34a;font-weight:700")
-                elif nl_up is False:
-                    styles.loc[i, "Novo Low €"] = (
-                        "background-color:rgba(239,68,68,0.18);"
-                        "color:#dc2626;font-weight:700")
-            return styles
-
-        styled = df_show.style.apply(style_alert_cells, axis=None)
-
-        # Show table + on-select graph
-        left_col, right_col = st.columns([3,2])
-        with left_col:
-            sel = st.dataframe(
-                styled,
-                use_container_width=True, hide_index=True,
-                on_select="rerun", selection_mode="single-row",
-                key=f"tbl_{ret}",
-                column_config={
-                    "⚑":             st.column_config.TextColumn("⚑",             width="small"),
-                    "Qtd":            st.column_config.TextColumn("Qtd",            width="small"),
-                    "Prof.%":         st.column_config.TextColumn("Prof.%",         width="small"),
-                    "Nova Prof.%":    st.column_config.TextColumn("Nova Prof.%",    width="small"),
-                    "Baseline €":     st.column_config.TextColumn("Baseline €",     width="small"),
-                    "Low €":          st.column_config.TextColumn("Low €",          width="small"),
-                    "Novo Baseline €":st.column_config.TextColumn("Novo Baseline €",width="small"),
-                    "Novo Low €":     st.column_config.TextColumn("Novo Low €",     width="small"),
-                    "ID":             st.column_config.TextColumn("ID",             width="small"),
-                },
-            )
-        with right_col:
-            selected_rows = sel.selection.rows if sel.selection.rows else []
-            if selected_rows:
-                idx = selected_rows[0]
-                row = sub_sorted.iloc[idx]
-                sub_hist = df[(df["PID"]==row["PID"]) & (df["Retalhista"]==row["Retalhista"]) & (df["Data"].dt.date >= p2_start) & (df["Data"].dt.date <= p2_end)].sort_values("Data")
-                st.markdown(f"**{row['Nome']}**  \n_{row['Marca']} · {row['Quantidade']}_")
-                fig2 = go.Figure()
-                if row["Tipo_Preco"]=="High-Low" and row["Preco_High"] and row["Preco_Low"]:
-                    fig2.add_hrect(y0=row["Preco_Low"]*0.99, y1=row["Preco_High"]*1.01,
-                                   fillcolor="rgba(234,179,8,0.06)", line_width=0)
-                    fig2.add_hline(y=row["Preco_High"], line_dash="dot", line_color="rgba(220,38,38,0.6)",
-                                   annotation_text=f"Baseline {row['Preco_High']:.2f}€", annotation_position="top right")
-                    fig2.add_hline(y=row["Preco_Low"], line_dash="dot", line_color="rgba(22,163,74,0.6)",
-                                   annotation_text=f"Low {row['Preco_Low']:.2f}€", annotation_position="bottom right")
-                fig2.add_trace(go.Scatter(
-                    x=sub_hist["Data"], y=sub_hist["Preco"], mode="lines+markers",
-                    line=dict(color=RETAILER_COLORS.get(row["Retalhista"],"#333"), width=2),
-                    marker=dict(size=5), name="Preço",
-                ))
-                if row["Alertas"]:
-                    alert_prices = {a["preco_novo"] for a in row["Alertas"]}
-                    anom = sub_hist[sub_hist["Preco"].isin(alert_prices)]
-                    if not anom.empty:
-                        fig2.add_trace(go.Scatter(
-                            x=anom["Data"], y=anom["Preco"], mode="markers",
-                            marker=dict(size=11, color="#f59e0b", symbol="diamond",
-                                        line=dict(color="#1a1a1a",width=1.5)),
-                            name="Preço novo ⚠️",
-                        ))
-                fig2.update_layout(height=320, margin=dict(t=10,b=10,l=10,r=10),
-                                   yaxis_title="€", template="plotly_white",
-                                   legend=dict(orientation="h", yanchor="bottom", y=1.01))
-                st.plotly_chart(fig2, use_container_width=True, key=f"chart2_{row['PID']}_{ret}")
-            else:
-                st.info("← Clica numa linha da tabela para ver o gráfico de evolução de preço.")
-
-        st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════════
-# TAB 4 — MONTAR GRÁFICOS
-# ═══════════════════════════════════════════════════════════════════
-with tab4:
-    st.markdown('<div class="section-header">📊 Montar Gráficos</div>', unsafe_allow_html=True)
-    st.markdown("Seleciona os filtros para visualizar a evolução histórica de múltiplos SKUs num único gráfico.")
-
-    g1, g2, g3, g4, g5 = st.columns(5)
-    with g1:
-        g_ret   = st.multiselect("Retalhista", retailers_sel, default=retailers_sel, key="g_ret")
-
-    # Cascading: Marca options depend on selected Retalhistas
-    _dg_pool = df.copy()
-    if g_ret:
-        _dg_pool = _dg_pool[_dg_pool["Retalhista"].isin(g_ret)]
-    if "Marca_Padronizada" in _dg_pool.columns:
-        _marca_opts4 = sorted(_dg_pool["Marca_Padronizada"].dropna().unique())
-    else:
-        _marca_opts4 = sorted(_dg_pool["Marca"].dropna().unique())
-
-    with g2:
-        g_brand = st.multiselect("Marca", _marca_opts4, key="g_brand")
-
-    # Cascading: Formato options depend on Retalhista + Marca
-    if g_brand:
-        _dg_pool2 = _dg_pool.copy()
-        if "Marca_Padronizada" in _dg_pool2.columns:
-            _dg_pool2 = _dg_pool2[_dg_pool2["Marca_Padronizada"].isin(g_brand)]
-        else:
-            _dg_pool2 = _dg_pool2[_dg_pool2["Marca"].isin(g_brand)]
-    else:
-        _dg_pool2 = _dg_pool.copy()
-    _dg_pool2["PID"] = _dg_pool2["PID"].astype(str)
-    _pool2_fmt = _dg_pool2.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    _fmt_opts4 = sorted(_pool2_fmt["Formato"].dropna().unique()) if (not _pool2_fmt.empty and "Formato" in _pool2_fmt.columns) else []
-
-    with g3:
-        g_fmt = st.multiselect("Formato", _fmt_opts4, key="g_fmt")
-
-    # Cascading: Tamanho depends on Retalhista + Marca + Formato
-    if g_fmt:
-        _dg_pool3 = _pool2_fmt[_pool2_fmt["Formato"].isin(g_fmt)]
-    else:
-        _dg_pool3 = _pool2_fmt.copy()
-    _size_opts4 = sorted(_dg_pool3["Quantidade"].dropna().astype(str).unique())
-
-    with g4:
-        g_size  = st.multiselect("Tamanho", _size_opts4, key="g_size")
-    with g5:
-        g_period = st.date_input("Período", value=(min_date,max_date), min_value=min_date, max_value=max_date, key="g_period")
-        gp_s, gp_e = (g_period[0],g_period[1]) if len(g_period)==2 else (min_date,max_date)
-
-    g_search = st.text_input("🔎 Pesquisar por nome do produto", placeholder="ex: Magnum, Cornetto…", key="g_search")
-
-    # Filter data
-    dg = df[(df["Data"].dt.date>=gp_s)&(df["Data"].dt.date<=gp_e)].copy()
-    if g_ret:    dg = dg[dg["Retalhista"].isin(g_ret)]
-    if g_brand:  dg = dg[dg["Marca_Padronizada"].isin(g_brand)] if "Marca_Padronizada" in dg.columns else dg[dg["Marca"].isin(g_brand)]
-    if g_size:   dg = dg[dg["Quantidade"].astype(str).isin(g_size)]
-    if g_search: dg = dg[dg["Nome"].str.contains(g_search, case=False, na=False)]
-    # Merge Formato for tab4 filter
-    dg["PID"] = dg["PID"].astype(str)
-    # Formato already in df (overlaid from glossario_mestre at startup)
-    if "Formato" in dg.columns:
-        dg = dg.drop(columns=["Formato"])
-    dg = dg.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-    if g_fmt:
-        if "Formato" not in dg.columns or dg["Formato"].isna().all():
-            st.warning("⚠️ O filtro Formato requer o ficheiro `glossario_formato.csv` no GitHub com classificações preenchidas.")
-        else:
-            dg = dg[dg["Formato"].isin(g_fmt)]
-
-    n_skus_g = dg.groupby(["PID","Retalhista"]).ngroups
-    st.markdown(f"**{n_skus_g} SKU(s)** com os filtros aplicados.")
-
-    MAX_LINES = 60
-    if n_skus_g == 0:
-        st.info("Nenhum SKU encontrado com os filtros aplicados.")
-    elif n_skus_g > MAX_LINES:
-        st.warning(f"Muitos SKUs ({n_skus_g}) para visualizar. Aplica mais filtros (sugestão: máx {MAX_LINES} linhas para boa leitura).")
-    else:
-        # ── Colour palette: evenly spaced hues, good contrast on dark bg ──────
-        import colorsys
-        n_lines = len(list(dg.groupby(["PID","Retalhista"])))
-        def hsl_palette(n):
-            colors = []
-            for i in range(n):
-                h = i / max(n, 1)
-                # Avoid yellow-green (0.20–0.35) which looks bad on dark bg
-                if 0.20 <= h <= 0.35: h = h + 0.15
-                r, g, b = colorsys.hls_to_rgb(h % 1.0, 0.65, 0.85)
-                colors.append(f"rgb({int(r*255)},{int(g*255)},{int(b*255)})")
-            return colors
-        PALETTE = hsl_palette(max(n_lines, 1))
-
-        DASHES = {"Continente":"solid","PingoDoce":"dash","Auchan":"dot"}
-        sku_groups = list(dg.groupby(["PID","Retalhista","Nome","Marca"]))
-
-        fig4 = go.Figure()
-        for i, ((pid,ret,nome,marca), grp) in enumerate(sku_groups):
-            grp   = grp.sort_values("Data")
-            color = PALETTE[i % len(PALETTE)]
-            dash  = DASHES.get(ret, "solid")
-            # Short label for legend
-            short = nome[:32] + ("…" if len(nome) > 32 else "")
-            fig4.add_trace(go.Scatter(
-                x=grp["Data"], y=grp["Preco"],
-                mode="lines",          # no markers — cleaner look
-                name=short,
-                line=dict(color=color, width=1.8, dash=dash),
-                hovertemplate=(
-                    f"<b>{nome}</b><br>"
-                    f"<span style='color:#aaa'>{ret}</span><br>"
-                    "%{x|%d %b %Y}<br>"
-                    "<b>%{y:.2f} €</b>"
-                    "<extra></extra>"
-                ),
-            ))
-
-        fig4.update_layout(
-            height=560,
-            template="plotly_dark",
-            yaxis_title="Preço (€)",
-            xaxis_title="",
-            hovermode="x unified",
-            hoverlabel=dict(bgcolor="#1e293b", font_size=12, font_color="white"),
-            legend=dict(
-                orientation="v",
-                yanchor="top", y=1,
-                xanchor="left", x=1.01,
-                font=dict(size=10.5, color="#e2e8f0"),
-                bgcolor="rgba(15,23,42,0.7)",
-                bordercolor="#334155", borderwidth=1,
-                itemsizing="constant",
-            ),
-            plot_bgcolor="#0f172a",
-            paper_bgcolor="#0f172a",
-            xaxis=dict(
-                showgrid=True, gridcolor="#1e293b", gridwidth=1,
-                zeroline=False, color="#94a3b8",
-            ),
-            yaxis=dict(
-                showgrid=True, gridcolor="#1e293b", gridwidth=1,
-                zeroline=False, color="#94a3b8",
-            ),
-            margin=dict(t=20, b=40, l=50, r=20),
-            font=dict(color="#e2e8f0"),
-        )
-        fig4.add_annotation(
-            text="— Continente &nbsp;&nbsp; - - PingoDoce &nbsp;&nbsp; · · · Auchan",
-            xref="paper", yref="paper", x=0.01, y=-0.07,
-            showarrow=False, font=dict(size=10, color="#64748b"),
-            align="left",
-        )
-        st.plotly_chart(fig4, use_container_width=True, key="chart_tab4_multi")
-
-        # ── Summary table below chart ─────────────────────────────────────────
-        st.markdown("#### Tabela de SKUs no gráfico")
-        # Build summary from sku_cls
-        pids_in_chart = dg[["PID","Retalhista"]].drop_duplicates()
-        tbl4 = pids_in_chart.merge(
-            sku_cls[["PID","Retalhista","Tipo_Preco","Preco_High","Preco_Low","Alert_Label","Alertas"]],
-            on=["PID","Retalhista"], how="left"
-        )
-        tbl4 = tbl4.merge(
-            df_sku_list[["PID","Retalhista","Nome","Marca","Quantidade"]],
-            on=["PID","Retalhista"], how="left"
-        )
-        tbl4 = tbl4.merge(df_fmt_lookup, on=["PID","Retalhista"], how="left")
-
-        # Get new baseline/low from alerts
-        def get_new_bl(alertas):
-            if not alertas: return "—"
-            nbs = [a for a in alertas if "Baseline" in a["tipo"]]
-            return f"{nbs[-1]['preco_novo']:.2f} €" if nbs else "—"
-        def get_new_low(alertas):
-            if not alertas: return "—"
-            nls = [a for a in alertas if "Low" in a["tipo"]]
-            return f"{nls[-1]['preco_novo']:.2f} €" if nls else "—"
-
-        tbl4["Baseline €"]     = tbl4["Preco_High"].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "—")
-        tbl4["Low €"]          = tbl4["Preco_Low"].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "—")
-        tbl4["Novo Baseline €"]= tbl4["Alertas"].apply(lambda x: get_new_bl(x) if x else "—")
-        tbl4["Novo Low €"]     = tbl4["Alertas"].apply(lambda x: get_new_low(x) if x else "—")
-        tbl4["Alerta"]         = tbl4["Alert_Label"].fillna("")
-
-        disp4 = tbl4[["Formato","Marca","Nome","Quantidade","Baseline €","Low €","Novo Baseline €","Novo Low €"]].copy()
-        disp4 = disp4.sort_values(["Formato","Marca","Nome"])
-        st.dataframe(disp4, use_container_width=True, hide_index=True)
-
-
-# ═══════════════════════════════════════════════════════════════════
-# TAB 5 — SKUs NÃO CLASSIFICADOS
-# ═══════════════════════════════════════════════════════════════════
-with tab5:
-    st.markdown('<div class="section-header">🏷️ Classificar SKUs</div>', unsafe_allow_html=True)
-
-    # Glossário vem de df_gl_full (carregado de glossario_mestre.csv)
-    # Construir dict PID_Retalhista → Formato para compatibilidade com o UI de classificação
-    _fmt_map = {}
-    for _, _r in df_gl_full.iterrows():
-        _k = f"{_r['PID']}_{_r['Retalhista']}"
-        if pd.notna(_r.get("Formato")) and str(_r.get("Formato","")) not in ("","nan"):
-            _fmt_map[_k] = str(_r["Formato"])
-    glossario = _fmt_map  # alias para o código do UI abaixo
-
-    # ── Build export CSV ───────────────────────────────────────────────────────
-    df_gl_export = df_sku_list[["PID","Retalhista","Nome","Marca","Marca_Padronizada","Quantidade","Formato"]].copy()
-    df_gl_export["Formato"] = df_gl_export["Formato"].fillna("")
-    csv_gl = df_gl_export.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-    # ── Top bar ───────────────────────────────────────────────────────────────
+def page_historico():
+    st.markdown('<div class="section-header">📈 Histórico de Preços</div>', unsafe_allow_html=True)
     st.markdown(
-        "O glossário é carregado automaticamente de **`glossario_mestre.csv`** no repositório GitHub. "
-        "Usa o botão abaixo para descarregar a versão actual com as classificações de Formato."
+        '<style>'
+        '.hist-filter-label{font-size:.72rem;color:#666;font-weight:600;margin:.6rem 0 .2rem;'
+        'text-transform:uppercase;letter-spacing:.04em;}'
+        # Cap Marca/Formato multiselects to a fixed height — extra chips
+        # scroll inside the box instead of pushing the page down.
+        'div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div{'
+        'max-height:2.5rem;overflow-y:auto;}'
+        '</style>',
+        unsafe_allow_html=True
     )
-    st.markdown(f"Actualmente com **{df_sku_list['Formato'].notna().sum()} / {len(df_sku_list)}** SKUs classificados.")
 
-    dl_col, reload_col = st.columns([3, 1])
-    with dl_col:
-        st.download_button(
-            label="⬇️ Descarregar glossário actual (glossario_mestre.csv)",
-            data=csv_gl,
-            file_name="glossario_mestre.csv",
-            mime="text/csv",
-            key="dl_glossario",
-            use_container_width=True,
-            type="primary",
-        )
-    with reload_col:
-        if st.button("🔄 Forçar recarga do GitHub", use_container_width=True, key="force_reload"):
-            load_glossario_mestre.clear()
-            st.success("Cache limpo! A recarregar...")
-            st.rerun()
-    st.caption("ℹ️ Após fazer upload para o GitHub, clica em **Forçar recarga** para ver as alterações imediatamente.")
+    # ── Período: De / Até + atalhos ──────────────────────────────────────────
+    if "hist_start" not in st.session_state:
+        st.session_state["hist_start"] = min_date
+    if "hist_end" not in st.session_state:
+        st.session_state["hist_end"] = max_date
 
-    st.markdown("---")
+    def _set_period(start, end):
+        # Must run BEFORE the date_input widgets below are instantiated —
+        # Streamlit forbids writing to session_state[key] once the widget
+        # with that key exists for this run. The three columns are created
+        # upfront as placeholders, then filled out of visual order so the
+        # buttons (which may mutate state) always execute first.
+        st.session_state["hist_start"] = start
+        st.session_state["hist_end"] = end
 
-    # ── Build full SKU table with glossário applied ───────────────────────────
-    df_all_skus = df_sku_list.copy()
-    df_all_skus["key_id"] = df_all_skus["PID"].astype(str) + "_" + df_all_skus["Retalhista"]
-    # Formato already in df_sku_list from glossario_mestre
+    ytd_start = max(min_date, max_date.replace(month=1, day=1))
+    l3m_start = max(min_date, max_date - timedelta(days=90))
+    _cur_start, _cur_end = st.session_state["hist_start"], st.session_state["hist_end"]
+    _active_css = ""
+    for _key, _match in (("hist_ytd", _cur_start == ytd_start and _cur_end == max_date),
+                          ("hist_l3m", _cur_start == l3m_start and _cur_end == max_date),
+                          ("hist_total", _cur_start == min_date and _cur_end == max_date)):
+        if _match:
+            _active_css += (f'.st-key-{_key} button{{background:#1a1a1a!important;'
+                             f'color:#f7f5f0!important;border-color:#1a1a1a!important;}}')
+    if _active_css:
+        st.markdown(f"<style>{_active_css}</style>", unsafe_allow_html=True)
 
-    n_total      = len(df_all_skus)
-    n_classified = df_all_skus["Formato"].notna().sum()
-    n_missing    = n_total - n_classified
-    pct = int(n_classified / n_total * 100) if n_total > 0 else 0
-    bar_color = "#16a34a" if pct == 100 else "#2563eb"
+    pc1, pc2, pc3, pc4, pc5 = st.columns([1.3, 1.3, 0.7, 0.7, 0.8])
+    with pc3:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("YTD", key="hist_ytd", use_container_width=True, help="Do início do ano até hoje"):
+            _set_period(ytd_start, max_date)
+    with pc4:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("L3M", key="hist_l3m", use_container_width=True, help="Últimos 90 dias"):
+            _set_period(l3m_start, max_date)
+    with pc5:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("Total", key="hist_total", use_container_width=True, help="Todo o período disponível"):
+            _set_period(min_date, max_date)
+    with pc1:
+        st.date_input("De", min_value=min_date, max_value=max_date, key="hist_start")
+    with pc2:
+        st.date_input("Até", min_value=min_date, max_value=max_date, key="hist_end")
 
-    st.markdown(f"""
-<div style="margin-bottom:1rem;">
-  <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#666;margin-bottom:.3rem;">
-    <span>Classificações: <strong>{n_classified} / {n_total}</strong></span>
-    <span><strong>{pct}%</strong> completo</span>
-  </div>
-  <div style="background:#e5e7eb;border-radius:8px;height:10px;overflow:hidden;">
-    <div style="background:{bar_color};width:{pct}%;height:100%;border-radius:8px;"></div>
-  </div>
-</div>""", unsafe_allow_html=True)
+    h_start, h_end = st.session_state["hist_start"], st.session_state["hist_end"]
+    if h_start > h_end:
+        h_start, h_end = h_end, h_start
 
-    if n_missing == 0:
-        st.success("✅ Todos os SKUs têm Formato classificado!")
+    # ── Retalhista: botões fixos (pills), nunca cresce ───────────────────────
+    st.markdown('<div class="hist-filter-label">Retalhista</div>', unsafe_allow_html=True)
+    ret_h = st.pills("Retalhista", retailers_sel, selection_mode="multi",
+                      default=retailers_sel, key="hist_ret", label_visibility="collapsed")
+
+    # Base pool: selected period + retailers, classified SKUs only (SKUs
+    # without a Formato — e.g. data-quality noise like a stray numeric code
+    # in the Marca field — are excluded here just like elsewhere in the app).
+    _hp = df[(df["Data"].dt.date >= h_start) & (df["Data"].dt.date <= h_end)
+             & df["Retalhista"].isin(ret_h or retailers_sel)
+             & df["Formato"].notna()].copy()
+
+    # ── Marca: seletor direto (sem etapa extra de popover), altura fixa ─────
+    st.markdown('<div class="hist-filter-label">Marca</div>', unsafe_allow_html=True)
+    _marca_opts_h = sorted(_hp["Marca_Padronizada"].dropna().unique())
+    marca_prev = [m for m in st.session_state.get("hist_marca", []) if m in _marca_opts_h]
+    marca_h = st.multiselect("Marca", _marca_opts_h, default=marca_prev,
+                              key="hist_marca", label_visibility="collapsed")
+    if marca_h:
+        st.caption(f"{len(marca_h)} marca(s) selecionada(s)")
+
+    _hp1 = _hp[_hp["Marca_Padronizada"].isin(marca_h)] if marca_h else _hp
+
+    # ── Formato: idem Marca ──────────────────────────────────────────────────
+    st.markdown('<div class="hist-filter-label">Formato</div>', unsafe_allow_html=True)
+    _fmt_opts_h = sorted(_hp1["Formato"].dropna().unique())
+    fmt_prev = [f for f in st.session_state.get("hist_fmt", []) if f in _fmt_opts_h]
+    fmt_h = st.multiselect("Formato", _fmt_opts_h, default=fmt_prev,
+                            key="hist_fmt", label_visibility="collapsed")
+    if fmt_h:
+        st.caption(f"{len(fmt_h)} formato(s) selecionado(s)")
+
+    search_h = st.text_input("🔎 Nome", placeholder="ex: Ben & Jerry's", key="hist_search")
+
+    # ── Apply all filters ────────────────────────────────────────────────────
+    hf = _hp1[_hp1["Formato"].isin(fmt_h)] if fmt_h else _hp1
+    if search_h:
+        hf = hf[hf["Nome_Agregador"].str.contains(search_h, case=False, na=False)]
+
+    if hf.empty:
+        st.info("Sem SKUs com os filtros selecionados.")
+        return
+
+    # ── Group into one row per (produto, marca, tamanho) — no duplicates ────
+    # A bare numeric key won't exist for ungrouped Quantidade (None), so use
+    # a stable placeholder for grouping purposes only.
+    hf = hf.copy()
+    hf["_qtd_key"] = hf["Quantidade_Padronizada"].fillna("—")
+
+    groups = []
+    for (nome_agg, marca_pad, qtd_key), g in hf.groupby(["Nome_Agregador", "Marca_Padronizada", "_qtd_key"]):
+        formato = g["Formato"].dropna().iloc[0] if g["Formato"].notna().any() else "—"
+        preco_min = g["Preco"].min()
+        preco_max = g["Preco"].max()
+        detail = []
+        for ret, sub in g.groupby("Retalhista"):
+            nome_orig = sub.sort_values("Data")["Nome"].iloc[-1]
+            detail.append({
+                "retalhista": ret, "nome_orig": nome_orig,
+                "min": sub["Preco"].min(), "max": sub["Preco"].max(),
+            })
+        detail.sort(key=lambda d: RETAILER_ORDER.index(d["retalhista"]) if d["retalhista"] in RETAILER_ORDER else 99)
+        groups.append({
+            "key": (nome_agg, marca_pad, qtd_key),
+            "Formato": formato, "Marca": marca_pad, "Nome": nome_agg,
+            "Quantidade": qtd_key, "min": preco_min, "max": preco_max,
+            "detail": detail,
+        })
+    groups.sort(key=lambda r: (r["Marca"], r["Nome"], r["Quantidade"]))
+
+    # Read the SKU table's previous selection (from before this run) so the
+    # chart — placed above the table — reflects the current pick immediately.
+    _prev_sel = st.session_state.get("hist_table")
+    _prev_rows = list(_prev_sel["selection"]["rows"]) if _prev_sel else []
+    selected_groups = [groups[i] for i in _prev_rows if i < len(groups)]
+
+    # ── Chart: one line per (produto+tamanho selecionado, retalhista) ───────
+    st.markdown("#### Gráfico de evolução")
+    if not selected_groups:
+        st.info("← Marca uma ou mais linhas na tabela abaixo para ver a evolução de preço.")
     else:
-        st.info(f"**{n_missing} SKU(s)** ainda sem classificação.")
+        line_specs = []  # (nome_agg, qtd_key, retalhista)
+        for row in selected_groups:
+            for d in row["detail"]:
+                line_specs.append((row["Nome"], row["Quantidade"], d["retalhista"]))
+        line_specs = list(dict.fromkeys(line_specs))  # de-dupe, keep order
+        n_lines_h = len(line_specs)
 
-    f5a, f5b, f5c = st.columns([1, 1, 2])
-    with f5a:
-        view_mode = st.radio("Mostrar:", ["Não classificados", "Todos os SKUs", "Apenas classificados"],
-                              horizontal=False, key="tab5_view")
-    with f5b:
-        uc_ret5 = st.multiselect("Retalhista", retailers_sel,
-                                  default=retailers_sel, key="uc_ret5")
-    with f5c:
-        uc_search5 = st.text_input("🔎 Pesquisar por nome ou PID",
-                                    placeholder="ex: Magnum, Cookie Dough, 8240610…",
-                                    key="uc_search5")
+        MAX_LINES_H = 60
+        if n_lines_h > MAX_LINES_H:
+            st.warning(f"Muitas linhas ({n_lines_h}) para uma leitura clara. "
+                        f"Reduz a seleção de produtos (sugestão: máx {MAX_LINES_H} linhas).")
+        else:
+            # All-solid lines, differentiated purely by a large, high-contrast
+            # basic-color palette (Dark24 + Light24 ≈ 48 distinct hues) — one
+            # color per line, no reliance on dash style to tell lines apart.
+            _BASIC_PALETTE = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
+            color_by_line = {spec: _BASIC_PALETTE[i % len(_BASIC_PALETTE)]
+                              for i, spec in enumerate(line_specs)}
 
-    if view_mode == "Não classificados":
-        display_skus = df_all_skus[df_all_skus["Formato"].isna()]
-    elif view_mode == "Apenas classificados":
-        display_skus = df_all_skus[df_all_skus["Formato"].notna()]
-    else:
-        display_skus = df_all_skus.copy()
+            fig_h = go.Figure()
+            for nome_agg, qtd_key, ret in line_specs:
+                grp = hf[(hf["Nome_Agregador"] == nome_agg) & (hf["_qtd_key"] == qtd_key) & (hf["Retalhista"] == ret)]
+                grp = grp.sort_values("Data")
+                if grp.empty:
+                    continue
+                label = f"{nome_agg} ({qtd_key}) — {ret}"
+                fig_h.add_trace(go.Scatter(
+                    x=grp["Data"], y=grp["Preco"], mode="lines+markers",
+                    name=label,
+                    line=dict(color=color_by_line[(nome_agg, qtd_key, ret)], width=2.4,
+                              shape="spline", smoothing=0.3),
+                    marker=dict(size=4, opacity=.85, line=dict(width=.5, color="white")),
+                    hovertemplate=(
+                        f"<b>{nome_agg}</b> ({qtd_key})<br>"
+                        f"<span style='color:#888'>{ret}</span><br>"
+                        "%{x|%d %b %Y}<br>"
+                        "<b>%{y:.2f} €</b>"
+                        "<extra></extra>"
+                    ),
+                ))
+            fig_h.update_layout(
+                height=560,
+                template="plotly_white",
+                plot_bgcolor="#fdfcfa",
+                paper_bgcolor="rgba(0,0,0,0)",
+                title=dict(
+                    text=f"Evolução de Preços — {n_lines_h} linha(s)",
+                    font=dict(family="'DM Serif Display', serif", size=18, color="#1a1a1a"),
+                    x=0, xanchor="left",
+                ),
+                yaxis_title="Preço (€)", xaxis_title="",
+                hovermode="x unified",
+                hoverlabel=dict(bgcolor="white", font_size=12, bordercolor="#ddd"),
+                legend=dict(
+                    orientation="v", yanchor="top", y=1, xanchor="left", x=1.02,
+                    font=dict(size=10.5), bgcolor="rgba(255,255,255,.92)",
+                    bordercolor="#e5e5e5", borderwidth=1,
+                ),
+                margin=dict(t=55, b=40, l=50, r=170),
+                xaxis=dict(showgrid=False, showspikes=True, spikemode="across",
+                           spikedash="dot", spikecolor="#999", spikethickness=1),
+                yaxis=dict(showgrid=True, gridcolor="#ececec", zeroline=False),
+            )
+            fig_h.update_xaxes(rangeslider=dict(visible=True, thickness=.06,
+                                                 bgcolor="#f1efe9", bordercolor="#ddd"),
+                                type="date")
+            st.plotly_chart(fig_h, use_container_width=True, key="chart_hist_multi")
 
-    display_skus = display_skus[display_skus["Retalhista"].isin(uc_ret5)]
-
-    if uc_search5:
-        mask = (
-            display_skus["Nome"].str.contains(uc_search5, case=False, na=False) |
-            display_skus["PID"].astype(str).str.contains(uc_search5, case=False, na=False) |
-            display_skus.get("Marca", pd.Series(dtype=str)).str.contains(uc_search5, case=False, na=False)
-        )
-        display_skus = display_skus[mask]
-
-    st.markdown(f"**{len(display_skus)} SKU(s)** com os filtros actuais.")
     st.markdown("---")
 
-    SEL_OPTIONS = ["— seleccionar —"] + FORMATO_OPTIONS
+    # ── SKU list — native selectable table, same widget/style as the         ─
+    # "Produtos Novos" tab (st.dataframe), so the two tabs look consistent.
+    st.markdown(f"**{len(groups)} produto(s)** com os filtros atuais &nbsp;·&nbsp; "
+                f"<span style='color:#888;font-size:.8rem'>marca as linhas para comparar no gráfico acima</span>",
+                unsafe_allow_html=True)
 
-    for ret in RETAILER_ORDER:
-        sub_uc = display_skus[display_skus["Retalhista"]==ret].copy()
-        if sub_uc.empty: continue
-        color = RETAILER_COLORS.get(ret,"#333")
-        st.markdown(
-            f"#### {ret} &nbsp; <span style='font-size:.85rem;color:{color}'>{len(sub_uc)} SKUs</span>",
-            unsafe_allow_html=True
-        )
-        for _, row in sub_uc.iterrows():
-            key_id    = row["key_id"]
-            current   = str(row.get("Formato","")) if pd.notna(row.get("Formato")) else "— seleccionar —"
-            current   = current if current in FORMATO_OPTIONS else "— seleccionar —"
-            nome_str  = str(row["Nome"])  if pd.notna(row.get("Nome"))       else f"(sem nome · PID {row['PID']})"
-            marca_str = str(row["Marca"]) if pd.notna(row.get("Marca"))      else "—"
-            qtd_str   = str(row["Quantidade"]) if pd.notna(row.get("Quantidade")) else "—"
+    table_rows = []
+    for row in groups:
+        retalhistas = ", ".join(d["retalhista"] for d in row["detail"])
+        table_rows.append({
+            "Formato": row["Formato"], "Marca": row["Marca"], "Nome": row["Nome"],
+            "Quantidade": row["Quantidade"], "Retalhistas": retalhistas,
+            "Mín €": row["min"], "Máx €": row["max"],
+        })
+    d_table = pd.DataFrame(table_rows)
+    d_table["Mín €"] = d_table["Mín €"].map("{:.2f}".format)
+    d_table["Máx €"] = d_table["Máx €"].map("{:.2f}".format)
 
-            col_info, col_sel, col_status = st.columns([3, 1, 0.6])
-            with col_info:
-                st.markdown(
-                    f"<strong>{nome_str}</strong><br>"
-                    f"<span style='color:#888;font-size:.8rem'>Marca: {marca_str} · Qtd: {qtd_str} · PID: {row['PID']}</span>",
-                    unsafe_allow_html=True
-                )
-            with col_sel:
-                chosen = st.selectbox(
-                    "Formato", SEL_OPTIONS,
-                    index=SEL_OPTIONS.index(current) if current in SEL_OPTIONS else 0,
-                    key=f"gls_{key_id}", label_visibility="collapsed",
-                )
-                if chosen != "— seleccionar —" and chosen != current:
-                    st.info(f"Para actualizar o Formato, edita o glossario_mestre.csv e faz upload para o GitHub.")
-            with col_status:
-                if current in FORMATO_OPTIONS:
-                    st.markdown(
-                        f'<div style="padding-top:.4rem"><span class="tag" style="background:#dcfce7;color:#166534;font-size:.75rem">✔ {current}</span></div>',
-                        unsafe_allow_html=True
-                    )
-            st.markdown("<hr style='margin:.3rem 0;border-color:#f1f5f9;'>", unsafe_allow_html=True)
-
-    # ── Full glossário viewer ─────────────────────────────────────────────────
-    st.markdown("---")
-    with st.expander(f"📖 Ver glossário completo ({len(df_sku_list)} SKUs)"):
-        view_df = df_sku_list[["PID","Retalhista","Nome","Marca","Marca_Padronizada","Quantidade","Formato"]].copy()
-        view_df["Formato"] = view_df["Formato"].fillna("(não classificado)")
-        st.dataframe(view_df.sort_values(["Marca_Padronizada","Nome"]), 
-                     use_container_width=True, hide_index=True)
-
+    st.dataframe(d_table, use_container_width=True, hide_index=True,
+                 on_select="rerun", selection_mode="multi-row", key="hist_table")
 
 # ═══════════════════════════════════════════════════════════════════
-# TAB 6 — ANÁLISE DE CLUSTERS (Beta)
+# TAB 3 — ANÁLISE DE CLUSTERS (Beta)
 # ═══════════════════════════════════════════════════════════════════
-with tab6:
+def page_clusters():
     st.markdown('<div class="section-header">🔬 Análise de Clusters <span style="font-size:.75rem;color:#888;font-family:DM Sans,sans-serif">(Beta)</span></div>', unsafe_allow_html=True)
     st.markdown("Agrupa SKUs por padrão de preço (Baseline + Low dentro de ±0.05 €). Hierarquia: **Retalhista → Marca → Formato → Cluster**.")
 
@@ -1146,8 +1225,8 @@ with tab6:
     # Build SKU summary first (needed for cascade)
     @st.cache_data(ttl=300)
     def build_sku_summary_cached(df_input):
-        """Build SKU price summary (Baseline, Low) with Marca_Padronizada and Formato.
-        df_input must already have Marca_Padronizada and Formato columns (from startup merge)."""
+        """Build SKU price summary (Baseline, Low) with Marca_Agregadora and Formato.
+        df_input must already have Marca_Agregadora and Formato columns (from startup merge)."""
         from collections import Counter as _C
         records = []
         for (pid, ret), grp in df_input.groupby(["PID","Retalhista"]):
@@ -1162,9 +1241,9 @@ with tab6:
             else:
                 top2 = sorted(cnt.keys(), key=lambda p: -cnt[p])[:2]
                 bl, low = max(top2), min(top2)
-            # Marca_Padronizada and Formato already in df_input from startup merge
+            # Marca_Agregadora and Formato already in df_input from startup merge
             row0 = grp.iloc[0]
-            marca = row0.get("Marca_Padronizada") if pd.notna(row0.get("Marca_Padronizada")) else row0["Marca"]
+            marca = row0.get("Marca_Agregadora") if pd.notna(row0.get("Marca_Agregadora")) else row0["Marca"]
             fmt   = row0.get("Formato") if pd.notna(row0.get("Formato")) else None
             qtd   = row0.get("Quantidade") if pd.notna(row0.get("Quantidade")) else ""
             records.append({"PID": str(pid), "Retalhista": ret,
@@ -1354,15 +1433,15 @@ with tab6:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# TAB NOW — PREÇO AGORA
+# TAB 4 — PREÇO AGORA
 # ═══════════════════════════════════════════════════════════════════
-with tab_now:
+def page_agora():
     st.markdown('<div class="section-header">🔍 Preço Agora</div>', unsafe_allow_html=True)
-    st.markdown("Preço **mais recente** de cada SKU por retalhista. Passe o cursor sobre um preço para ver Mín/Máx dos últimos 30 dias.")
+    st.markdown("Preço **da semana mais recente** (mínimo registado) de cada SKU por retalhista. Passe o cursor sobre um preço para ver Mín/Máx dos últimos 30 dias.")
 
     # ── Build "now" dataset ───────────────────────────────────────────────────
-    # df already has Marca_Padronizada and Formato from the startup merge
-    _src_cols = ["PID","Retalhista","Nome","Marca","Marca_Padronizada","Quantidade","Formato","Preco","Data"]
+    # df already has Nome_Agregador, Marca_Agregadora and Formato from the startup merge
+    _src_cols = ["PID","Retalhista","Nome","Marca","Nome_Agregador","Marca_Agregadora","Quantidade","Formato","Preco","Data","Semana"]
     _src_cols = [c for c in _src_cols if c in df.columns]
 
     _now_latest = (df[_src_cols].sort_values("Data")
@@ -1370,16 +1449,16 @@ with tab_now:
     _now_latest.rename(columns={"Preco":"Preco_Atual","Data":"Data_Leitura"}, inplace=True)
     _now_latest["PID"] = _now_latest["PID"].astype(str)
 
-    # Ensure Marca_Padronizada column exists with fallback
-    if "Marca_Padronizada" not in _now_latest.columns:
-        _now_latest["Marca_Padronizada"] = _now_latest["Marca"]
+    # Ensure Marca_Agregadora column exists with fallback
+    if "Marca_Agregadora" not in _now_latest.columns:
+        _now_latest["Marca_Agregadora"] = _now_latest["Marca"]
     else:
-        _now_latest["Marca_Padronizada"] = _now_latest["Marca_Padronizada"].fillna(_now_latest["Marca"])
+        _now_latest["Marca_Agregadora"] = _now_latest["Marca_Agregadora"].fillna(_now_latest["Marca"])
 
     if "Formato" not in _now_latest.columns:
         _now_latest["Formato"] = None
 
-    _now_marca_col = "Marca_Padronizada"
+    _now_marca_col = "Marca_Agregadora"
 
     _cutoff_30 = pd.Timestamp(max_date) - timedelta(days=30)
     _df_30 = df[df["Data"] >= _cutoff_30].copy()
@@ -1396,40 +1475,29 @@ with tab_now:
         st.markdown("#### Filtros")
 
         # ── Cascading pool (we derive all options from _now_full, cascading down) ──
-        # Step 1: Retalhista (no dependency)
-        _np0 = _now_full.copy()
-        _now_ret_opts = sorted(_np0["Retalhista"].dropna().unique())
-        now_ret = st.multiselect("Retalhista", _now_ret_opts, default=_now_ret_opts, key="now_ret")
-
-        # Step 2: Marca — filtered by Retalhista
-        _np1 = _np0[_np0["Retalhista"].isin(now_ret)] if now_ret else _np0.copy()
+        # Note: no Retalhista filter here on purpose — this table always shows
+        # every retailer side by side as comparison columns, so filtering by
+        # retailer would just hide columns rather than narrow the product list.
+        # Step 1: Marca (aggregated — Marca_Agregadora)
+        _np1 = _now_full.copy()
         _now_marca_opts = sorted(_np1[_now_marca_col].dropna().unique())
         now_marca = st.multiselect("Marca", _now_marca_opts, key="now_marca")
 
-        # Step 3: Formato — filtered by Retalhista + Marca
+        # Step 2: Formato — filtered by Marca
         _np2 = _np1[_np1[_now_marca_col].isin(now_marca)] if now_marca else _np1.copy()
         _now_fmt_opts = sorted(_np2["Formato"].dropna().unique()) if "Formato" in _np2.columns else []
         now_fmt = st.multiselect("Formato", _now_fmt_opts, key="now_fmt")
 
-        # Step 4: Tamanho — filtered by above
+        # Step 3: Tamanho — filtered by above
         _np3 = _np2[_np2["Formato"].isin(now_fmt)] if now_fmt else _np2.copy()
         _now_size_opts = sorted(_np3["Quantidade"].dropna().astype(str).unique())
         now_size = st.multiselect("Tamanho", _now_size_opts, key="now_size")
 
-        # Step 5: SKU — filtered by above, shows consolidated names
+        # Step 4: SKU (aggregated — Nome_Agregador) — filtered by above, shows
+        # consolidated names (always populated — falls back to the SKU's own
+        # Nome when it isn't part of a cross-retailer group)
         _np4 = _np3[_np3["Quantidade"].astype(str).isin(now_size)] if now_size else _np3.copy()
-        # For SKU options, show Nome_Padronizado when available, else Nome
-        _np4_gl = _np4.merge(
-            df_gl_full[["PID","Retalhista","Grupo_ID","Nome_Padronizado"]].copy().assign(PID=df_gl_full["PID"].astype(str)),
-            on=["PID","Retalhista"], how="left"
-        )
-        # Build display name per group: prefer Nome_Padronizado, fallback to Nome
-        def _display_name_for_sku(row):
-            np_v = str(row.get("Nome_Padronizado",""))
-            if np_v and np_v not in ("nan",""):
-                return np_v
-            return row["Nome"]
-        _now_sku_display = sorted(set(_np4_gl.apply(_display_name_for_sku, axis=1).dropna()))
+        _now_sku_display = sorted(set(_np4["Nome_Agregador"].dropna()))
         now_sku = st.multiselect("SKU", _now_sku_display, key="now_sku")
 
         # Free-text search → click-to-add
@@ -1451,57 +1519,25 @@ with tab_now:
 
     # ── Apply all filters ─────────────────────────────────────────────────────
     _nf = _now_full.copy()
-    if now_ret:    _nf = _nf[_nf["Retalhista"].isin(now_ret)]
     if now_marca:  _nf = _nf[_nf[_now_marca_col].isin(now_marca)]
     if now_fmt and "Formato" in _nf.columns:
                    _nf = _nf[_nf["Formato"].isin(now_fmt)]
     if now_size:   _nf = _nf[_nf["Quantidade"].astype(str).isin(now_size)]
-    # now_sku contains display names (Nome_Padronizado or Nome) — match against both
+    # now_sku contains Nome_Agregador display names
     if now_sku:
-        _gl_for_filter = df_gl_full[["PID","Retalhista","Nome_Padronizado"]].copy()
-        _gl_for_filter["PID"] = _gl_for_filter["PID"].astype(str)
-        _nf = _nf.merge(_gl_for_filter, on=["PID","Retalhista"], how="left")
-        _nf["_display"] = _nf["Nome_Padronizado"].where(
-            _nf["Nome_Padronizado"].notna() & (_nf["Nome_Padronizado"].astype(str).str.strip() != "") & (_nf["Nome_Padronizado"].astype(str) != "nan"),
-            _nf["Nome"]
-        )
-        _nf = _nf[_nf["_display"].isin(now_sku)]
-        _nf = _nf.drop(columns=["_display"], errors="ignore")
+        _nf = _nf[_nf["Nome_Agregador"].isin(now_sku)]
     elif now_search:
         _nf = _nf[_nf["Nome"].str.contains(now_search, case=False, na=False)]
 
-    # ── Merge Grupo_ID and Nome_Padronizado from glossary ─────────────────────
-    # This enables consolidation: same product across retailers → one row
-    _gl_keys = df_gl_full[["PID","Retalhista","Grupo_ID","Nome_Padronizado"]].copy()
-    _gl_keys["PID"] = _gl_keys["PID"].astype(str)
-    _nf = _nf.merge(_gl_keys, on=["PID","Retalhista"], how="left")
-
     # ── Build consolidation key ────────────────────────────────────────────────
-    # If Grupo_ID exists → use it (groups the same product across retailers).
-    # If not → use PID+Retalhista (product is unique to one retailer, no merge needed).
-    def _make_group_key(row):
-        g = row.get("Grupo_ID")
-        if pd.notna(g) and str(g) not in ("", "nan"):
-            return f"G_{g}"
-        return f"P_{row['PID']}_{row['Retalhista']}"
-
-    _nf["_group_key"] = _nf.apply(_make_group_key, axis=1)
-
-    # ── Choose display name for each group ────────────────────────────────────
-    # Priority: Nome_Padronizado > most readable original name (PingoDoce > Continente > Auchan)
-    _RET_PRIO = {"PingoDoce": 0, "Continente": 1, "Auchan": 2}
+    # Nome_Agregador + Marca_Agregadora together identify a cross-retailer
+    # product cluster from the automatic matching engine (build_agregadores).
+    # A SKU not part of any cluster keeps its own Nome/Marca as the "group",
+    # so it naturally shows on its own row.
+    _nf["_group_key"] = "G_" + _nf["Nome_Agregador"].astype(str) + "_" + _nf["Marca_Agregadora"].astype(str)
 
     def _best_display_name(grp):
-        # If Nome_Padronizado is set, use it
-        np_vals = grp["Nome_Padronizado"].dropna()
-        np_vals = np_vals[np_vals.astype(str).str.strip().replace("nan","") != ""]
-        if not np_vals.empty:
-            return np_vals.iloc[0]
-        # Otherwise pick the most readable name (title-case, prefer PingoDoce)
-        grp_sorted = grp.copy()
-        grp_sorted["_prio"] = grp_sorted["Retalhista"].map(_RET_PRIO).fillna(9)
-        grp_sorted = grp_sorted.sort_values("_prio")
-        return grp_sorted["Nome"].iloc[0]
+        return grp["Nome_Agregador"].iloc[0]
 
     with right_tbl:
         n_groups = _nf["_group_key"].nunique()
@@ -1534,6 +1570,7 @@ with tab_now:
                             "min":   r["Min_30d"] if pd.notna(r.get("Min_30d")) else None,
                             "max":   r["Max_30d"] if pd.notna(r.get("Max_30d")) else None,
                             "data":  r["Data_Leitura"].strftime("%d/%m/%Y") if pd.notna(r.get("Data_Leitura")) else "—",
+                            "semana": str(r["Semana"]) if pd.notna(r.get("Semana")) else "—",
                             "nome_orig": str(r["Nome"]),
                         }
                 _pivot_rows.append(row_d)
@@ -1558,7 +1595,7 @@ with tab_now:
                         preco_str = f"{v['atual']:.2f} €"
                         mn = f"{v['min']:.2f} €" if v["min"] is not None else "—"
                         mx = f"{v['max']:.2f} €" if v["max"] is not None else "—"
-                        tooltip = f"{v['nome_orig']}&#10;Última leitura: {v['data']}&#10;Mín 30d: {mn}&#10;Máx 30d: {mx}"
+                        tooltip = f"{v['nome_orig']}&#10;Semana: {v['semana']} ({v['data']})&#10;Mín 30d: {mn}&#10;Máx 30d: {mx}"
                         cells += (
                             f'<td style="text-align:center;padding:5px 10px;" title="{tooltip}">'
                             f'<span style="background:{color}15;color:{color};font-weight:700;'
@@ -1592,11 +1629,61 @@ with tab_now:
 </table>
 </div>
 <p style="font-size:.72rem;color:#aaa;margin-top:.4rem;">
-  💡 Passe o cursor sobre um preço para ver o nome original, Mín/Máx dos últimos 30 dias e data da última leitura.
+  💡 Passe o cursor sobre um preço para ver o nome original, a semana e Mín/Máx dos últimos 30 dias.
   Produtos comuns a vários retalhistas estão consolidados numa só linha.
 </p>
 """
             st.markdown(table_html, unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════
+# TAB 5 — NOTAS
+# ═══════════════════════════════════════════════════════════════════
+def page_notas():
+    st.markdown('<div class="section-header">📝 Notas</div>', unsafe_allow_html=True)
+    st.markdown(
+        "Questões em aberto que o motor de agrupamento automático (Nome Agregador / "
+        "Marca Agregadora) encontrou mas não teve confiança suficiente para resolver sozinho. "
+        "Nestes casos, cada SKU envolvido continua a aparecer separadamente na app até haver revisão."
+    )
+
+    if df_notas_grouping.empty:
+        st.success("Sem questões em aberto no momento.")
+        return
+
+    st.markdown(f"**{len(df_notas_grouping)} caso(s)** — ordenados por probabilidade de serem o mesmo produto.")
+
+    for _, r in df_notas_grouping.iterrows():
+        with st.container():
+            st.markdown(f"""
+<div style="background:#fdf9ee;border-left:3px solid #d4a017;border-radius:6px;
+            padding:.7rem 1rem;margin-bottom:.6rem;">
+  <div style="font-size:.72rem;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem;">
+    Possível produto duplicado &nbsp;·&nbsp; confiança {r['Score']:.0f}%
+  </div>
+  <div style="font-size:.9rem;margin-bottom:.15rem;">
+    <strong>SKU {r['PID_A']}</strong> ({r['Retalhista_A']}) — {r['Nome_A']}
+  </div>
+  <div style="font-size:.9rem;margin-bottom:.4rem;">
+    <strong>SKU {r['PID_B']}</strong> ({r['Retalhista_B']}) — {r['Nome_B']}
+  </div>
+  <div style="font-size:.8rem;color:#666;">
+    💡 Sugestão: comparar os dois produtos manualmente. Se forem o mesmo, nenhuma acção é
+    necessária na app — o agrupamento é automático; se forem produtos diferentes, também
+    não é preciso fazer nada. Esta nota existe apenas porque a semelhança de nome/marca/tamanho
+    não foi suficientemente alta para o sistema decidir sozinho.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Sidebar navigation (native Streamlit — no custom CSS needed) ───────────────
+pg = st.navigation([
+    st.Page(page_novos,       title="Produtos Novos",              icon="🆕", url_path="novos",       default=True),
+    st.Page(page_historico,   title="Histórico de Preços",         icon="📈", url_path="historico"),
+    st.Page(page_clusters,    title="Análise de Clusters (Beta)",  icon="🔬", url_path="clusters"),
+    st.Page(page_agora,       title="Preço Agora",                 icon="🔍", url_path="agora"),
+    st.Page(page_notas,       title="Notas",                       icon="📝", url_path="notas"),
+])
+pg.run()
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
