@@ -902,3 +902,8 @@ PID,Retalhista,Nome,Marca,Marca_Padronizada,Quantidade,Formato,Formato_Origem
 824328,PingoDoce,Sobremesa Geladitos,,Siglitos,Quantidade não disponível,,
 8968631,Continente,Morangos Cobertos com Chocolate Branco e Chocolate Branco com Caramelo Gold Franuí,,Franuí,emb. 150 gr,Bites,Auto (marca_fixa)
 4043808,Auchan,TABLETE CHOCOLATE NESTLÉ CHOCO TRIO COOKIES&CREAM 90G,,NESTLÉ,90G,,
+8853415,Continente,Gelado de Maracujá Gelataria Continente,,Continente,emb. 450 ml,Pints,Auto (nome_fallback)
+8936482,Continente,Gelado de Ovos Moles Gelataria Continente,,Continente,emb. 450 ml,Pints,Auto (nome_fallback)
+8853468,Continente,Gelado de Pistácio Gelataria Continente,,Continente,emb. 450 ml,Pints,Auto (nome_fallback)
+8936479,Continente,Gelado Sorvete de Framboesa Gelataria Continente,,Continente,emb. 450 ml,Pints,Auto (nome_fallback)
+7671,Auchan,SNACK DE CHOCOLATE KIT KAT MINI 200 G,,KIT KAT,200 G,,
